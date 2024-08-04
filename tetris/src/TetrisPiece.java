@@ -1,21 +1,24 @@
-import java.awt.*;
-import java.util.Scanner;
+import java.awt.Color;
 
 /**
  * Class used to define a single piece in Tetris.
+ * <p>
  * A piece cannot be instantiated without an ambient board to hold it.
  * By default, a 4x4 grid is established to hold the piece.
  * When the Board class instantiates a piece, it must pass the board width and height
  * as parameters.
- * All pieces must have a pivot location to define where the piece sits within the board.
- * The pivot point is used for rotation and initialization as well.
+ * <p>
+ * All pieces have a pivot location to define where the piece sits within the board.
+ * The pivot point is used for piece movement and border logic.
  * Piece is conceptualized as a list of coordinates where the piece is defined + pivot.
+ * <p>
  * Example: boardWidth = 4, boardHeight = 4:
  * 00 01 02 03
  * 04 05 06 07
  * 08 09 10 11
  * 12 13 14 15
- * Then the pivot point is 1 and the pieces are given as:
+ * <p>
+ * Then the pivot point is 01 and the pieces are given as:
  * O = {1, 2, 5, 6}
  * I = {1, 5, 9, 13}
  * S = {1, 2, 4, 5}
@@ -23,30 +26,33 @@ import java.util.Scanner;
  * L = {1, 5, 9, 10}
  * J = {1, 5, 8, 9}
  * T = {1, 4, 5, 6}
+ *
+ * @author adamm.hockman@gmail.com
  */
 public class TetrisPiece {
 
-    public static int NUM_OF_COORDINATES = 4;
+    // declare static constants
+    private static final int NUM_OF_COORDINATES = 4;
+    private static final int MIN_BOARD_HEIGHT = 4;
+    private static final int MIN_BOARD_WIDTH = 4;
 
-    private static int MIN_BOARD_HEIGHT = 4;
-    private static int MIN_BOARD_WIDTH = 4;
-
-    private final Color pieceColor;
-
-    private final int boardHeight;
-    private final int boardWidth;
+    // piece specific information
     private final char pieceType;
-
     private int[] coordinates;
     private int pivot;
+    private final Color pieceColor;
 
-// ***************************************************************************
-//   * Constructors.
-// ***************************************************************************
+    // ambient board information
+    private final int boardHeight;
+    private final int boardWidth;
+
+
+/* ***************************************************************************
+ *    * Constructors
+ ****************************************************************************/
 
     /**
-     * Constructor that takes a specified type and size and initializes a new TetrisPiece.
-     * This is the main constructor the other constructors call.
+     * This is the main constructor the other constructor variations call.
      * Piece coordinates are assigned based on the piece type, and the pivot point.
      * The pivot point is computed automatically. This is used when generating new
      * pieces at the top of the board.
@@ -75,15 +81,15 @@ public class TetrisPiece {
     }
 
     /**
-     * Constructor allows us to assign all instance variables upon creation. Note
-     * that the Board should never call this method. The Board will always generate
+     * Constructor allows us to assign all instance variables upon creation.
+     * Note that the Board should never call this method. The Board will always generate
      * a new piece at the top.
+     * <p>
      * This constructor allows for a copy() method. This returns a new reference to
      * a TetrisPiece that has all the same field data (deep copied).
      * This will be necessary in testing for boundaries and collisions when moving
      * the piece.
-     * We will attempt to move a copy of the piece, then only update our piece if the
-     * new piece is valid.
+     *
      * @param pieceType the char piece type
      * @param boardHeight the height of the board
      * @param boardWidth the width of the board
@@ -105,18 +111,16 @@ public class TetrisPiece {
     }
 
     /**
-     * Private method used to assign the initial piece coordinates to the class variable.
-     * Also assumes the initial pivot point has already been set.
-     * This is used later for moving pieces.
-     * This method uses the values assigned to the global class variables in the constructor.
-     * Separated as a separate method for code cleanliness and organization only.
-     * Called by main constructor.
+     * Private method used to assign the initial piece coordinates.
+     * Assumes the initial pivot point has already been set.
+     * Called by main constructor to simplify code.
      */
     private void setInitialPieceCoordinates() {
 
         // initialize the coordinates array
         this.coordinates = new int[NUM_OF_COORDINATES];
 
+        // logic is explicitly defined
         switch (pieceType) {
             case ('O'):
                 coordinates[0] = pivot;
@@ -165,14 +169,13 @@ public class TetrisPiece {
     }
 
 
-// ***************************************************************************
-//   * Accessor methods for encapsulating piece information.
-// ***************************************************************************
+/* ***************************************************************************
+ *    * Accessor Methods
+ ****************************************************************************/
 
     /**
-     * Accessor method used to extract coordinates. Needed for equals() method.
-     *
-     * @return the array of coordinates for the instance piece
+     * Accessor method used to extract coordinates.
+     * @return piece coordinates
      */
     public int[] getCoordinates() {
 
@@ -181,8 +184,7 @@ public class TetrisPiece {
     }
 
     /**
-     * Accessor method used to extract ambient boardHeight. Needed for equals() method.
-     *
+     * Accessor method used to extract ambient boardHeight.
      * @return the ambient board height containing the instance piece
      */
     public int getBoardHeight() {
@@ -192,8 +194,7 @@ public class TetrisPiece {
     }
 
     /**
-     * Accessor method used to extract ambient boardWidth. Needed for equals() method.
-     *
+     * Accessor method used to extract ambient boardWidth.
      * @return the ambient board width containing the instance piece
      */
     public int getBoardWidth() {
@@ -202,15 +203,24 @@ public class TetrisPiece {
 
     }
 
+    /**
+     * Accessor method used to extract piece type.
+     * @return the char piece type
+     */
     public char getPieceType() {
         return pieceType;
     }
 
+    /**
+     * Accessor method used to extract the piece color.
+     * @return the piece color
+     */
     public Color getPieceColor() { return pieceColor; }
 
-    // ***************************************************************************
-//   * Method for copying instances.
-// ***************************************************************************
+
+/* ***************************************************************************
+ *    * Copy Method
+ ****************************************************************************/
 
     /**
      * Public method used to obtain a new reference (separate from the instance
@@ -222,23 +232,22 @@ public class TetrisPiece {
 
         // deep copy the coordinates array before initializing
         int[] copyCoordinates = new int[NUM_OF_COORDINATES];
-        for (int i = 0; i < NUM_OF_COORDINATES; i++) {
-            copyCoordinates[i] = coordinates[i];
-        }
+        System.arraycopy(coordinates, 0, copyCoordinates, 0, NUM_OF_COORDINATES);
 
         return new TetrisPiece(pieceType, pieceColor, boardHeight, boardWidth, copyCoordinates, pivot);
 
     }
 
-// ***************************************************************************
-//   * Methods for rotating piece.
-// ***************************************************************************
+
+/* ***************************************************************************
+ *    * Rotation Methods
+ ****************************************************************************/
 
     /**
-     * Method rotates the instance piece calling it by updating the piece's
-     * coordinates. Logic is determined by the pieceType and the pivot position.
-     * Overwrites the coordinates list with the coordinates of the resulting rotated piece.
-     * Must check that rotation won't cross board boundaries.
+     * Method used to rotate piece. Updates the coordinate list.
+     * Logic is determined entirely by piece type and pivot location.
+     *
+     * @return true if rotation was successful, false otherwise
      */
     public boolean rotate() {
 
@@ -246,21 +255,22 @@ public class TetrisPiece {
         if (pieceType == 'O')
             return true;
 
+        // check that we have room to rotate along the edge
         if (pivotAlongEdge())
             return false;
 
-
-        // first rotate the underlying grid for all pieces, using a 4x4 grid
-        // for the 'I' piece, and a 3x3 for the other pieces.
+        // first rotate the underlying grid for all pieces,
+        // using a 4x4 grid for type 'I', and a 3x3 grid for the rest.
         if (pieceType == 'I')
             rotateNxN(4);
         else
             rotateNxN(3);
 
-        // then shift up the pieces to their pivot, if necessary.
+        // shift up the pieces to their pivot, if necessary.
         if (pieceType == 'I' || pieceType == 'S' || pieceType == 'Z')
             shiftToPivot();
 
+        // at this point the rotation was successful
         return true;
 
     }
@@ -268,35 +278,31 @@ public class TetrisPiece {
     /**
      * Private method used to verify whether a piece can be rotated.
      * Uses basic logic based on the pivot's row and column value.
-     * @return true if the pivot is near the edge and hence, cannot be rotated
+     *
+     * @return true if the pivot is near the edge and cannot be rotated
      */
     private boolean pivotAlongEdge() {
 
-        // check for left and right edge
-        // Fact: If the pivot is along the left or right column,
-        // the piece can not be rotated
+        // check for side edges
         int pivotCol = pivot % boardWidth;
         boolean sidesCheck;
 
-        // NOTE: The 'I' piece has a separate check for the right side, and bottom
+        // The 'I' piece has a separate check for the right side, and bottom
         // since it needs an additional square to rotate
         if (pieceType == 'I')
             sidesCheck = (pivotCol == 0 || (boardWidth - 1 - pivotCol) < 2);
         else
             sidesCheck = (pivotCol == 0 || (boardWidth - 1 - pivotCol) < 1);
 
-
         // check for bottom edge
-        // Fact: If the pivot point is 1 row from the bottom row,
-        // the piece can not be rotated
         int pivotRow = pivot / boardWidth;
         boolean bottomCheck;
 
+        // if the pivot point is 1 row from the bottom row, the piece can not be rotated
         if (pieceType == 'I')
             bottomCheck = (boardHeight - 1 - pivotRow) < 3;
         else
             bottomCheck = (boardHeight - 1 - pivotRow) < 2;
-
 
         return (sidesCheck || bottomCheck);
 
@@ -304,10 +310,10 @@ public class TetrisPiece {
 
     /**
      * Private method used to help with rotating the 'I', 'S', and 'Z' piece.
-     * These pieces only have one rotation since the second rotation brings them back to their
-     * original coordinates, only translated. Therefore, we occasionally need to shift the
-     * piece up so that the top row of the piece is the same row as the pivot point (for 'S'
-     * or 'Z'), or one below the pivot for 'I'.
+     * In classic Tetris, these pieces have only 2 rotations, given certain translations.
+     * <p>
+     * We need to shift the piece up so that the top row of the piece is the same row as
+     * the pivot point (for 'S' or 'Z'), or one below the pivot for 'I'.
      */
     private void shiftToPivot() {
 
@@ -332,152 +338,62 @@ public class TetrisPiece {
     }
 
     /**
-     * Private method used to rotate the ambient NxN grid holding the piece (excl. 'O').
-     * The 'I' piece requires a 4x4 rotation, whereas the rest use a 3x3.
-     * Uses the representation in coordinates[], and the pivot location, to update coordinates
-     * to rotated position. We rely on the relationship: pivot vs boardWidth
+     * Private method used to rotate the ambient NxN grid holding the piece.
+     * The 'I' piece requires a 4x4 grid rotation, whereas the rest use a 3x3 grid.
+     * <p>
      * First map the coordinates to a grid representation.
      * Then rotate the grid and map back to coordinates.
      * Mapping will depend on pivot point.
+     *
+     * @param N int size of ambient grid to rotate
      */
     private void rotateNxN(int N) {
 
-        // DEBUG
-        /*
-        System.out.println("rotateNxN() called with N = " + N);
-        System.out.println("Coordinates: " + showCoordinates());
-        System.out.println("Pivot      : " + pivot);
-        System.out.println("----------------------------------------------");
-         */
+        // initialize a new grid of 1s and 0s to represent the NxN grid coordinates
+        int[][] grid = new int[N][N];
 
-        // set grid size to value N received
-        int miniGridSize = N;
-
-        // first: translate coordinates to a NxN grid representation as follows:
-        // initialize a new grid of 1s and 0s
-        int[][] grid = new int[miniGridSize][miniGridSize];
-
-        // DEBUG
-        /*
-        System.out.println("Creating grid to visualize transformation matrix.");
-        printGrid(grid);
-
-         */
-
-        // first we observe the row and col shift by noting pivot vs boardWidth
-        // p - 1 = rowShift * (boardWidth) + colShift
+        // calculate row and col shift: pivot - 1 = rowShift * (boardWidth) + colShift
         int rowShift = (pivot - 1) / boardWidth;
         int colShift = (pivot - 1) % boardWidth;
 
-        // DEBUG
-        /*
-        System.out.println("p - 1 = rowShift * boardWidth + colShift");
-        System.out.println("   p - 1 = " + (pivot-1));
-        System.out.println("rowShift = " + rowShift);
-        System.out.println("colShift = " + colShift);
-        System.out.println("----------------------------------------------");
-
-
-        // DEBUG
-        System.out.println("Processing coordinate entries:");
-        System.out.println();
-
-         */
-
-        // for each entry in coordinates determine entry location then apply
-        // row and column shifts from above
+        // map convert each coordinate
         for (int i = 0; i < NUM_OF_COORDINATES; i++) {
-            // entry = entryRow ( boardWidth ) + entryCol
+
+            // get entry value, row, and col
             int entry = coordinates[i];
             int entryRow = entry / boardWidth;
             int entryCol = entry % boardWidth;
 
-            // DEBUG
-            /*
-            System.out.println("Rotating entry coordinate : " + entry);
-            System.out.println();
-            System.out.println("row = entry d boardWidth : " + entryRow);
-            System.out.println("col = entry % boardWidth : " + entryCol);
-            System.out.println();
-
-             */
-
-            // next apply the row and col shift from above to update the entry positions
+            // apply row and col shift
             entryRow -= rowShift;
             entryCol -= colShift;
-
-            // DEBUG
-            /*
-            System.out.println("entryRow = entryRow - rowShift : " + entryRow);
-            System.out.println("entryCol = entryCol - colShift : " + entryCol);
-            System.out.println();
-
-             */
-
 
             // set location to 1 to indicate piece coordinate
             grid[entryRow][entryCol] = 1;
 
-            // DEBUG
-            /*
-            printGrid(grid);
-            System.out.println("----------------------------------------------");
-
-             */
-
         }
 
 
-        // DEBUG STATEMENT
-        /*
-        System.out.println("New coordinate grid:");
-        for (int i = 0; i < grid.length; i++) {
-            for (int j = 0; j < grid[i].length; j++) {
-                if (grid[i][j] == 0)
-                    System.out.print("- ");
-                else
-                    System.out.print("0 ");
-            }
-            System.out.println();
-        }
-
-         */
-
-
-        // second: rotate the NxN grid counter-clockwise
-        // we can apply a sort of reverse transpose to rotate the matrix
-        int[][] rotatedGrid = new int[miniGridSize][miniGridSize];
-        for (int col = 0; col < miniGridSize; col++) {
+        // rotate the grid counter-clockwise by 90 degrees
+        // NOTE: we can apply a sort of reverse transpose to rotate the matrix
+        int[][] rotatedGrid = new int[N][N];
+        for (int col = 0; col < N; col++) {
             // apply the values (in reverse) to the corresponding col
-            for (int row = 0; row < miniGridSize; row++) {
-                rotatedGrid[row][col] = grid[col][miniGridSize - row - 1];
-            }
+            for (int row = 0; row < N; row++)
+                rotatedGrid[row][col] = grid[col][N - row - 1];
         }
         grid = rotatedGrid;
 
 
-        // DEBUG STATEMENT
-        /*
-        System.out.println("New rotated coordinate grid:");
-        for (int i = 0; i < grid.length; i++) {
-            for (int j = 0; j < grid[i].length; j++) {
-                if (grid[i][j] == 0)
-                    System.out.print("- ");
-                else
-                    System.out.print("0 ");
-            }
-            System.out.println();
-        }
-
-         */
-
-
-        // third: translate the rotated grid to coordinates list
-        // wherever there is a '1' entry, reverse the mapping above
+        // map the rotated grid back to coordinates list
         int[] rotatedCoordinates = new int[NUM_OF_COORDINATES];
+
+        // tracks which coordinates we map
         int index = 0;
-        for (int i = 0; i < miniGridSize; i++) {
-            for (int j = 0; j < miniGridSize; j++) {
+
+        // look for '1' entries
+        for (int i = 0; i < N; i++) {
+            for (int j = 0; j < N; j++) {
                 if (grid[i][j] == 1) {
                     // first reverse the row and col shift
                     int entryRow = i + rowShift;
@@ -494,36 +410,22 @@ public class TetrisPiece {
         // update the coordinates list with the new one
         coordinates = rotatedCoordinates;
 
-        // DEBUG STATEMENT
-        /*
-        System.out.println("Coordinates for the new piece after rotation:");
-        System.out.print("{ ");
-        for (int i = 0; i < NUM_OF_COORDINATES; i++) {
-            System.out.print(coordinates[i] + ",");
-            if (i < NUM_OF_COORDINATES - 1)
-                System.out.print(" ");
-            else
-                System.out.print("}");
-        }
-        System.out.println();
-
-         */
-
     }
 
-// ***************************************************************************
-//   * Methods for translating piece. Left, Down, Right
-// ***************************************************************************
+
+/* ***************************************************************************
+ *    * Translation Methods: Left, Down, Right
+ ****************************************************************************/
 
     /**
-     * Public method used to translate the piece to the left.
-     * Must check if moving the piece would exceed the board boundary.
-     * @return true if the piece was able to be moved successfully
+     * Method used to translate piece left. Updates the coordinate list.
+     * Logic is determined entirely by piece type and pivot location.
+     *
+     * @return true if translation was successful, false otherwise
      */
     public boolean left() {
 
-        // update a copy of the coordinates, that way we don't override some
-        // coordinates but return false on others.
+        // update a copy of the coordinates, then update all at once
         int[] shiftCoordinates = new int[NUM_OF_COORDINATES];
 
         // verify that each coordinate can be translated left,
@@ -536,30 +438,31 @@ public class TetrisPiece {
 
             // cannot shift left if any coordinate is in column 0
             // otherwise, subtract 1 to represent a shift left
-            if (entryCol == 0) {
+            if (entryCol == 0)
                 return false;
-            } else {
+            else
                 shiftCoordinates[i] = entryVal - 1;
-            }
+
         }
-        // at this point, all coordinates were able to be shifted left,
-        // so override coordinates with the new shifted coordinates
+        // at this point, all coordinates were shifted left,
+        // so update coordinates with shifted coordinates
         coordinates = shiftCoordinates;
-        // and update the pivot point accordingly
+
+        // update the pivot point accordingly
         pivot = pivot - 1;
 
         return true;
     }
 
     /**
-     * Public method used to translate the piece to the right.
-     * Must check if moving the piece would exceed the board boundary
-     * @return true if the piece was able to be moved successfully
+     * Method used to translate piece right. Updates the coordinate list.
+     * Logic is determined entirely by piece type and pivot location.
+     *
+     * @return true if translation was successful, false otherwise
      */
     public boolean right() {
 
-        // update a copy of the coordinates, that way we don't override some
-        // coordinates but return false on others.
+        // update a copy of the coordinates, then update all at once
         int[] shiftCoordinates = new int[NUM_OF_COORDINATES];
 
         // verify that each coordinate can be translated right,
@@ -570,32 +473,33 @@ public class TetrisPiece {
             int entryVal = coordinates[i];
             int entryCol = entryVal % boardWidth;
 
-            // cannot shift right if any coordinate is in column boardWisth - 1
+            // cannot shift right if any coordinate is in column boardWidth - 1
             // otherwise, add 1 to represent a shift right
-            if (entryCol == (boardWidth - 1)) {
+            if (entryCol == (boardWidth - 1))
                 return false;
-            } else {
+            else
                 shiftCoordinates[i] = entryVal + 1;
-            }
+
         }
-        // at this point, all coordinates were able to be shifted right,
-        // so override coordinates with the new shifted coordinates
+        // at this point, all coordinates were shifted right,
+        // so update coordinates with shifted coordinates
         coordinates = shiftCoordinates;
-        // and update the pivot point accordingly
+
+        // update the pivot point accordingly
         pivot = pivot + 1;
 
         return true;
     }
 
     /**
-     * Public method used to translate the piece down.
-     * Must check if moving the piece would exceed the board boundary
-     * @return true if the piece was able to be moved successfully
+     * Method used to translate piece down. Updates the coordinate list.
+     * Logic is determined entirely by piece type and pivot location.
+     *
+     * @return true if translation was successful, false otherwise
      */
     public boolean down() {
 
-        // update a copy of the coordinates, that way we don't override some
-        // coordinates but return false on others.
+        // update a copy of the coordinates, then update all at once
         int[] shiftCoordinates = new int[NUM_OF_COORDINATES];
 
         // verify that each coordinate can be translated down,
@@ -608,70 +512,29 @@ public class TetrisPiece {
 
             // cannot shift right if any coordinate is in row (boardHeight - 1)
             // otherwise, add 1 to represent a shift right
-            if (entryRow == (boardHeight - 1)) {
+            if (entryRow == (boardHeight - 1))
                 return false;
-            } else {
+            else
                 shiftCoordinates[i] = entryVal + boardWidth;
-            }
+
         }
-        // at this point, all coordinates were able to be shifted down,
-        // so override coordinates with the new shifted coordinates
+        // at this point, all coordinates were shifted down,
+        // so update coordinates with shifted coordinates
         coordinates = shiftCoordinates;
-        // and update the pivot point accordingly
+
+        // update the pivot point accordingly
         pivot = pivot + boardWidth;
 
         return true;
     }
 
-// ***************************************************************************
-//   * Methods for verifying piece movements.
-// ***************************************************************************
 
-    /**
-     * Method takes the current state of the piece coordinates and checks for
-     * any cases of a piece being 'out of bounds'.
-     * This happens when a piece has coordinates in both the left and right
-     * column.
-     * @return
-     */
-    private boolean withinBoardBounds() {
+/* ***************************************************************************
+ *    * Debug Methods
+ ****************************************************************************/
 
-        // check each coordinate to see if any entries occupy eiter the
-        // left or right columns
-        // along the way, if any entry is past the bottom row, we will
-        // immediately return false
-        boolean leftCol = false;
-        boolean rightCol = false;
-        for (int i = 0; i < NUM_OF_COORDINATES; i++) {
-            // get entry information
-            int entry = coordinates[i];
-            int entryRow = entry / boardWidth;
-            int entryCol = entry % boardWidth;
-            if (entryRow >= boardHeight)
-                return false;
-            if (entryCol == 0)
-                leftCol = true;
-            if (entryCol == (boardWidth - 1))
-                rightCol = true;
-        }
-        if (leftCol && rightCol)
-            return false;
-        else
-            return true;
-
-    }
-
-// ***************************************************************************
-//   * Miscellaneous methods for comparing and printing pieces.
-// ***************************************************************************
-
-    /**
-     * Determines whether two pieces have the same coordinates, regardless of rotated state.
-     * Must verify the ambient board sizes are the same first. Throw an exception if not.
-     *
-     * @param newPiece the TetrisPiece to be compared to the instance piece
-     * @return true iff all coordinates in the instance and new piece are equal
-     */
+    // DEBUG: Allows for checking whether two pieces have the same coordinates
+    /*
     public boolean equals(TetrisPiece newPiece) {
 
         if (boardHeight != newPiece.getBoardHeight() || boardWidth != newPiece.getBoardWidth())
@@ -687,11 +550,10 @@ public class TetrisPiece {
 
         return true;
     }
-
-    /**
-     * Used to display a TetrisPiece in the ambient 4x4 pieceGrid.
-     * @return
      */
+
+    // DEBUG: Allows for printing a piece in the terminal for testing
+    /*
     public String toString() {
 
         String pieceString = "";
@@ -713,15 +575,10 @@ public class TetrisPiece {
 
         return pieceString;
     }
-
-    /**
-     * Private helper method used in creating the toString.
-     * Checks if a given coordinate (arbitrary) is equal to one of the piece coordinates.
-     * Used in determining where to print pieces on an ambient board.
-     *
-     * @param coordinate the location to be checked against
-     * @return true if the coordinate location is one of the piece coordinates
      */
+
+    // DEBUG: Used in other debug methods like toString()
+    /*
     private boolean containsCoordinate(int coordinate) {
 
         for (int i = 0; i < NUM_OF_COORDINATES; i++) {
@@ -731,8 +588,10 @@ public class TetrisPiece {
         return false;
 
     }
+     */
 
-    // used for print methods in main
+    // DEBUG: Used for print methods in test client
+    /*
     public String showCoordinates() {
 
         String coordString = "[ ";
@@ -745,64 +604,21 @@ public class TetrisPiece {
         return coordString;
 
     }
-
-
-// ***************************************************************************
-//   * Test Client.
-// ***************************************************************************
-
-
-
-    /**
-     * Test client for the TetrisPiece class.
-     * @param args command line arguments
      */
+
+
+/* ***************************************************************************
+ *    * Test Client
+ ****************************************************************************/
+
+    // DEBUG: Test client for debugging
+    /*
     public static void main(String[] args) {
 
         int boardHeight = 6;
         int boardWidth = 5;
 
         char[] pieceLibrary = {'O','I','S','Z','L','J','T'};
-
-        // Test for initialization of each piece type, and explicit rotations
-        /*
-        for (int i = 0; i < pieceLibrary.length; i++) {
-            char type = pieceLibrary[i];
-            System.out.println("Creating piece : '" + type + "'");
-            TetrisPiece piece = new TetrisPiece(type, boardHeight, boardWidth);
-            TetrisPiece rotaterPiece = new TetrisPiece(type, boardHeight, boardWidth);
-            System.out.println(piece);
-
-            System.out.println("Rotating piece : '" + type + "'");
-            rotaterPiece.rotate();
-            while (!rotaterPiece.equals(piece)) {
-                System.out.println(rotaterPiece);
-                rotaterPiece.rotate();
-            }
-        }
-         */
-
-        // Test for translations left / right / down and boundary detection
-        /*
-        for (int i = 0; i < pieceLibrary.length; i++) {
-
-            // create new piece for set type
-            char type = pieceLibrary[i];
-            System.out.println("Creating piece : '" + type + "'");
-            TetrisPiece piece = new TetrisPiece(type, boardHeight, boardWidth);
-            TetrisPiece shifterPiece = new TetrisPiece(type, boardHeight, boardWidth);
-            System.out.println(piece);
-
-            // System.out.println("Shifting piece left : '" + type + "'");
-            // System.out.println("Shifting piece right : '" + type + "'");
-            System.out.println("Shifting piece down : '" + type + "'");
-
-
-            while (shifterPiece.down()) {
-                System.out.println(shifterPiece);
-            }
-        }
-         */
 
         // Test each piece type for dynamic movements: left / right / down / flip
         // Allows for CLI manipulation of individual piece types
@@ -833,8 +649,6 @@ public class TetrisPiece {
                 System.out.println("D/d : move down");
                 System.out.println("F/f : flip (rotate)");
                 System.out.println("X/x : return to piece type");
-
-
                 System.out.println();
 
                 // now we dynamically allow for user manipulation of piece
@@ -908,55 +722,11 @@ public class TetrisPiece {
 
         } while (type != 'X' && type != 'x');
 
-
-        /*
-        // Test for consistency
-        int counter = 0;
-
-        TetrisPiece pieceS = new TetrisPiece('S',5,8);
-        TetrisPiece pieceS2 = new TetrisPiece('S',5,7);
-
-        TetrisPiece pieceZ = new TetrisPiece('Z',5,8);
-        TetrisPiece pieceZ2 = new TetrisPiece('Z',5,8);
-
-        TetrisPiece rotaterPiece = pieceZ2;
-        while (counter < 10) {
-            System.out.println("Iteration : " + counter);
-            System.out.println(rotaterPiece);
-            rotaterPiece.rotate();
-            counter++;
-        }
-
-         */
-
-        //Scanner scanner = new Scanner(System.in);
-        //char input;
-
-        //System.out.println("Welcome, enter 'q' to quit.");
-
-        /*
-        do {
-            System.out.print("Enter piece type (I,S,Z,L,J,O,T) : ");
-            input = scanner.nextLine().charAt(0);
-
-            if (!validPieceType(input)) {
-                System.out.println("Not a valid entry");
-            } else {
-                TetrisPiece piece = new TetrisPiece(input);
-                TetrisPiece rotatedPiece = piece;
-                do {
-                    System.out.println(rotatedPiece);
-                    rotatedPiece = rotatedPiece.rotate();
-                } while (!rotatedPiece.equals(piece));
-            }
-
-        } while (input != 'q');
-
-         */
-
-
     }
+     */
 
+    // DEBUG: Used in the test client
+    /*
     private static boolean validatePieceType(char[] library, char choice) {
 
         for (int i = 0; i < library.length; i++) {
@@ -966,5 +736,6 @@ public class TetrisPiece {
         return false;
 
     }
+     */
 
 }

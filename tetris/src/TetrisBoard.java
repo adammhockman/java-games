@@ -1,36 +1,33 @@
-import java.awt.*;
+import java.awt.Color;
 import java.util.Arrays;
 import java.util.Random;
 
 
 /**
- * A Board is conceptualized similarly to a piece in that we consider a board
- * of size width and height to be a list of coordinate entries:
- * * {0, 1, 2, ... , width * height - 1}
- *
- * However, We will maintain a boolean grid to maintain where each coordinate
- * entry is occupied. Essentially, a board is just a grid of boolean values,
- * where 'true' indicates the board is occupied.
- *
+ * A Board is conceptualized as a boolean grid where true indicates the
+ * location is occupied. We also have an active piece, stored separately.
+ * <p>
  * We map between coordinate entries, and coordinates themselves by noting
- * * * * entry = row * boardWidth + col
- *
+ * ** entry = row * boardWidth + col
+ * <p>
  * A board will always have an active piece once the initial piece has been
  * generated. This piece receives all movement commands.
- *
  * Final resting position of a piece is recorded before generating a new piece.
+ *
+ * @author adamm.hockman@gmail.com
  */
 public class TetrisBoard {
 
+    // ----- Static Fields
     // default values represent an optimized view in TetrisDisplay
     private static final int DEFAULT_HEIGHT = 20;
     private static final int DEFAULT_WIDTH = 10;
-    private static final int MIN_HEIGHT = 4;
-    private static final int MIN_WIDTH = 4;
+    private static final int MIN_HEIGHT = 6;
+    private static final int MIN_WIDTH = 6;
     private static final double DEFAULT_ASP_RATIO = ((double) DEFAULT_HEIGHT) / DEFAULT_WIDTH;
-
-    // arrays to store the libraries of piece types and colors
-    private static final char[] pieceTypeLibrary = {'O', 'I', 'S', 'Z', 'L', 'J', 'T'};
+    private static final double SQUARE_OUTLINE_RADIUS = 0.0005;
+    private static final Color SQUARE_OUTLINE_COLOR = Color.BLACK;
+    private static final Color GRID_LINES_COLOR = Color.LIGHT_GRAY;
 
     // define color space for pieces
     private static final Color AZURE_WHITE = new Color(219, 233, 244);
@@ -41,28 +38,31 @@ public class TetrisBoard {
     private static final Color FOREST = new Color(74, 103, 65);
     private static final Color LEAF = new Color(52, 194, 48);
 
-    public static final Color[] colorLibrary = {AZURE_WHITE, MIDNIGHT, NAVY, BABY_BLUE, SLATE, FOREST, LEAF};
+    // declare the libraries of piece types and colors
+    private static final char[] PIECE_TYPE_LIBRARY = {'O', 'I', 'S', 'Z', 'L', 'J', 'T'};
+    private static final Color[] COLOR_LIBRARY = {AZURE_WHITE, MIDNIGHT, NAVY, BABY_BLUE, SLATE, FOREST, LEAF};
 
-    // the number of rows are columns in the board, respectively
+
+    // ----- Board Specific Fields
+    // number of rows and cols, respectively
     private final int height;
     private final int width;
 
-    // ----------------------------------------------------------------------------
+    // boolean array to indicate which squares are occupied and which are vacant
+    private final boolean[][] grid;
+    // Color array to indicate the color of each grid square
+    private final Color[][] gridColors;
 
-    // a boolean array to store which grid squares are occupied and which are vacant
-    private boolean[][] grid;
-    // an array used to keep track of which color each grid square should be drawn as
-    private Color[][] gridColors;
 
+    // ----- Dynamic Fields
     // pointers to the current and next piece
     private TetrisPiece activePiece;
     private TetrisPiece nextPiece;
-    private char nextPieceType;
 
-    // keeps track of a user's score
+    // user score
     private int linesCleared;
 
-    // fields used for drawing the board
+    // drawing parameters
     private double xMin;
     private double xMax;
     private double yMin;
@@ -70,30 +70,18 @@ public class TetrisBoard {
     private double gridSquareSize;
 
 
-
-// ***************************************************************************
-//   * Constructors.
-// ***************************************************************************
-
-    /**
-     * Default constructor.
-     * Calls the main constructor with the default values as parameters.
-     */
-    public TetrisBoard() {
-
-        this(DEFAULT_HEIGHT, DEFAULT_WIDTH);
-
-    }
+/* ***************************************************************************
+ *    * Constructors and Initialization
+ ****************************************************************************/
 
     /**
      * Constructor initializes a new TetrisBoard with provided width and height.
-     *
-     * Set initial volume to 0.
+     * <p>
      * The activePiece is initially set to null. Once a piece is generated,
-     * and can never again be null.
+     * it can never again be null.
      *
-     * @param height The height of the TetrisBoard to be initialized.
-     * @param width The width of the TetrisBoard to be initialized
+     * @param height int number of rows
+     * @param width int number of cols
      */
     public TetrisBoard(int height, int width) {
 
@@ -105,6 +93,7 @@ public class TetrisBoard {
         this.width = width;
         this.height = height;
 
+        // initialize remaining fields
         this.grid = new boolean[height][width];
         for (boolean[] arr : grid)
             Arrays.fill(arr, false);
@@ -116,7 +105,7 @@ public class TetrisBoard {
         // initialize score to 0
         this.linesCleared = 0;
 
-        // until we generate a piece, we keep it null for display purposes
+        // null until we generate a piece
         this.activePiece = null;
 
         // initialize the next piece to be generated
@@ -124,8 +113,15 @@ public class TetrisBoard {
 
     }
 
-
-    // public method to set the drawing area for the tetris board within an ambient canvas
+    /**
+     * Public method used to set draw parameters. Values represent the location
+     * of the board within the ambient game display visual console.
+     *
+     * @param xMin double location of left side of board
+     * @param yMin double location of bottom of board
+     * @param xMax double location of right side of board
+     * @param yMax double location of top of board
+     */
     public void setScale(double xMin, double yMin, double xMax, double yMax) {
 
         this.xMin = xMin;
@@ -133,7 +129,7 @@ public class TetrisBoard {
         this.yMin = yMin;
         this.yMax = yMax;
 
-        // assign the calculated parameters
+        // calculate grid size based on aspect ratio
         double aspRatio = ((double) height) / width;
 
         if (aspRatio < DEFAULT_ASP_RATIO) {
@@ -144,61 +140,61 @@ public class TetrisBoard {
             this.xMax = (1 / aspRatio) * (yMax - yMin) + xMin;
         }
 
-
     }
 
-    public int getHeight() {
-        return height;
-    }
 
-    public int getWidth() {
-        return width;
-    }
+/* ***************************************************************************
+ *    * Accessor Methods
+ ****************************************************************************/
 
-    public int getLinesCleared() {
+    /**
+     * Accessor method used to get current score.
+     * @return int total lines cleared
+     */
+    public int score() {
+
         return linesCleared;
+
     }
 
+    /**
+     * Accessor method used to get the next piece in queue. Used for drawing.
+     * @return TetrisPiece next piece to become active piece
+     */
     public TetrisPiece getNextPiece() {
+
         return nextPiece;
+
     }
 
-// ***************************************************************************
-//   * Methods to draw the board to StdOut
-// ***************************************************************************
 
+/* ***************************************************************************
+ *    * Draw Methods
+ ****************************************************************************/
+
+    /**
+     * Draws the current board configuration to Standard Draw.
+     * Covers the display area defined by the setScale() initialization.
+     */
     public void draw() {
 
+        // draw board grid lines
         drawGameGrid();
+        // draw occupied grid squares
         drawBoard();
+        // draw the current active piece
         drawActivePiece();
 
     }
 
-    public void draw(double a) {
-
-        drawGameGrid();
-        drawBoard(a);
-        drawActivePiece(a);
-
-    }
-
-
     /**
-     * Private method used to draw the outer ambient frame that displays the game.
-     * This is necessary when refreshing the display.
+     * Private method used to draw faint grid lines that delineate grid squares.
+     * Note this draws the "inner" grid lines only.
      */
     private synchronized void drawGameGrid() {
 
-        // draw the "viewing area in bold black"
-        /*
-        StdDraw.setPenColor(Color.BLACK);
-        StdDraw.setPenRadius(0.005);
-        StdDraw.rectangle(0.5, 1.0, 0.5, 1.0);
-         */
-
         // draw the ambient grid lines in light grey
-        StdDraw.setPenColor(Color.LIGHT_GRAY);
+        StdDraw.setPenColor(GRID_LINES_COLOR);
         StdDraw.setPenRadius(0.001);
 
         // draw the horizontal grid lines
@@ -232,6 +228,72 @@ public class TetrisBoard {
         }
     }
 
+    /**
+     * Private auxiliary method used to display the current active piece.
+     */
+    private void drawActivePiece() {
+
+        if (activePiece == null)
+            return;
+
+        int[] pieceCoordinates = activePiece.getCoordinates();
+        for (int coordinate : pieceCoordinates) {
+            int cRow = coordinate / width;
+            int cCol = coordinate % width;
+            drawPieceSquare(cRow, cCol);
+        }
+
+    }
+
+    /**
+     * Private helper method used to draw a single piece square at a given row and
+     * column position
+     * Method uses class variables to determine position, size, and appearance.
+     * @param row int row of the square to be drawn
+     * @param col int column of the square to be drawn
+     */
+    private synchronized void drawPieceSquare(int row, int col) {
+
+        // get square half-length / center offset
+        double squareCenter = 0.5 * gridSquareSize;
+
+        // get center x and y (flip y since origin is at bottom left)
+        double x = xMin + squareCenter + col * gridSquareSize;
+        double y = yMax - squareCenter - row * gridSquareSize;
+
+        // get square color
+        Color squareColor;
+        if (gridColors[row][col] == null)
+            squareColor = activePiece.getPieceColor();
+        else
+            squareColor = gridColors[row][col];
+
+        // fill interior of square with squareColor
+        StdDraw.setPenColor(squareColor);
+        StdDraw.filledSquare(x, y, squareCenter);
+
+        // lightly outline each square in black
+        StdDraw.setPenColor(SQUARE_OUTLINE_COLOR);
+        StdDraw.setPenRadius(SQUARE_OUTLINE_RADIUS);
+        StdDraw.square(x, y, squareCenter);
+
+    }
+
+
+/* ***************************************************************************
+ *    * Animate Methods
+ ****************************************************************************/
+
+    // ----------- JAVADOC ----------- //
+
+    public void draw(double a) {
+
+        drawGameGrid();
+        drawBoard(a);
+        drawActivePiece(a);
+
+    }
+
     private void drawBoard(double a) {
 
         for (int row = 0; row < height; row++) {
@@ -241,26 +303,6 @@ public class TetrisBoard {
                 }
             }
         }
-    }
-
-    /**
-     * Private auxiliary method used to display the current active piece.
-     * Note the grid coordinate locations and the active piece locations
-     * are tracked separately.
-     */
-    private void drawActivePiece() {
-
-        if (activePiece == null)
-            return;
-
-        int[] pieceCoordinates = activePiece.getCoordinates();
-        for (int i = 0; i < pieceCoordinates.length; i++) {
-            int coordinate = pieceCoordinates[i];
-            int cRow = coordinate / width;
-            int cCol = coordinate % width;
-            drawPieceSquare(cRow, cCol);
-        }
-
     }
 
     private void drawActivePiece(double a) {
@@ -275,43 +317,6 @@ public class TetrisBoard {
             int cCol = coordinate % width;
             drawPieceSquare(cRow, cCol, a);
         }
-
-    }
-
-    /**
-     * Private helper method used to draw a single piece square at a given row and
-     * column position
-     * Method uses board width to determine the size of a single square on a [0, 1]
-     * horizontal scale.
-     * @param row the row of the square to be drawn
-     * @param col the column of the dquare to be drawn
-     */
-    private synchronized void drawPieceSquare(int row, int col) {
-
-        // DEBUG
-        // System.out.println("Printing square at row = " + row + " and col = " + col);
-
-        // get square half-length
-        double squareCenter = 0.5 * gridSquareSize;
-
-        double x = xMin + squareCenter + col * gridSquareSize;
-        // flip y since origin is at bottom left
-        double y = yMax - squareCenter - row * gridSquareSize;
-
-        Color squareColor;
-        if (gridColors[row][col] == null)
-            squareColor = activePiece.getPieceColor();
-        else
-            squareColor = gridColors[row][col];
-
-        // fill interior of square with squareColor
-        StdDraw.setPenColor(squareColor);
-        StdDraw.filledSquare(x, y, squareCenter);
-
-        // lightly outline each square in black
-        StdDraw.setPenColor(Color.BLACK);
-        StdDraw.setPenRadius(0.0005);
-        StdDraw.square(x, y, squareCenter);
 
     }
 
@@ -350,19 +355,18 @@ public class TetrisBoard {
 
     }
 
-// ***************************************************************************
-//   * Boolean methods.
-// ***************************************************************************
+    // ----------- JAVADOC ----------- //
+
+
+/* ***************************************************************************
+ *    * Boolean Methods
+ ****************************************************************************/
 
     /**
-     * A method that allows a TetrisBoard to check if a given TetrisPiece
-     * causes any "collisions" (i.e. locations where both the grid and the
-     * are occupied)
-     * For each coordinate value in the test piece's coordinates array,
-     * we find the corresponding row and col in grid[][] using modular
-     * arithmetic. If that location is occupied (true), then we have
-     * a collision.
-     * @param piece any TetrisPiece with same board dimensions
+     * Public method checks whether an arbitrary TetrisPiece will collide with
+     * any of the stored piece coordinates.
+     *
+     * @param piece TetrisPiece with same board dimensions
      * @return true if there are any collision locations
      */
     public boolean collisions(TetrisPiece piece) {
@@ -374,8 +378,7 @@ public class TetrisBoard {
             throw new UnsupportedOperationException("Piece and Board have different dimensions");
 
         int[] pieceCoordinates = piece.getCoordinates();
-        for (int i = 0; i < pieceCoordinates.length; i++) {
-            int coordinate = pieceCoordinates[i];
+        for (int coordinate : pieceCoordinates) {
             int cRow = coordinate / width;
             int cCol = coordinate % width;
             if (grid[cRow][cCol])
@@ -385,17 +388,40 @@ public class TetrisBoard {
         return false;
     }
 
-// ***************************************************************************
-//   * Piece creation.
-// ***************************************************************************
+    /**
+     * Private helper method called by the clearLines() method.
+     * Checks whether a given row is full (i.e. no unoccupied squares).
+     *
+     * @param row int row to check if full
+     * @return boolean true if the row is full, false otherwise
+     */
+    private boolean isRowFull(int row) {
+
+        boolean fullRow = true;
+        int col = 0;
+
+        while (fullRow && col < width) {
+            if (!grid[row][col])
+                fullRow = false;
+            col++;
+        }
+
+        return fullRow;
+    }
+
+
+/* ***************************************************************************
+ *    * Piece Creation
+ ****************************************************************************/
 
     /**
      * Primary method for piece creation.
-     * * (1) First we check for a current activePiece. If we already have one,
-     * *     we first store the activePiece and update board coordinates.
-     * * (2) It chooses a piece type from piece library at random (with
-     * *     uniform probability).
-     * * (3) Then instantiate the piece and assign it to activePiece reference.
+     * * (1) Store active piece.
+     * * (2) Clear any full lines.
+     * * (3) Load next piece.
+     * * (4) Queue next piece.
+     *
+     * @return boolean true if new piece was generated, false if failed
      */
     public boolean generatePiece() {
 
@@ -420,15 +446,23 @@ public class TetrisBoard {
 
     }
 
+    /**
+     * Private method used to randomly generate a new piece and update the
+     * piece in queue.
+     */
     private void queueNextPiece() {
 
         Random random = new Random();
-        int pieceTypeIndex = random.nextInt(pieceTypeLibrary.length);
-        char nextPieceType = pieceTypeLibrary[pieceTypeIndex];
 
-        int pieceColorIndex = random.nextInt(colorLibrary.length);
-        Color pieceColor = colorLibrary[pieceColorIndex];
+        // get random piece type
+        int pieceTypeIndex = random.nextInt(PIECE_TYPE_LIBRARY.length);
+        char nextPieceType = PIECE_TYPE_LIBRARY[pieceTypeIndex];
 
+        // get random piece color
+        int pieceColorIndex = random.nextInt(COLOR_LIBRARY.length);
+        Color pieceColor = COLOR_LIBRARY[pieceColorIndex];
+
+        // update reference
         this.nextPiece = new TetrisPiece(nextPieceType, pieceColor, height, width);
 
     }
@@ -437,19 +471,21 @@ public class TetrisBoard {
      * Private method used to store the active piece on the board.
      * This maps the coordinate entries of the active piece to their row and
      * column positions, then sets them to true in board grid.
-     *
+     * <p>
      * NOTE: This method assumes collisions have already been accounted for--
      * it will not check if the grid is occupied before setting it to occupied
-     * Use the collision detection method to prevent this apriori.
-     *
-     * We also assume a piece has CORRECT coordinates between 0 and
+     * Use the collision detection method to prevent this.
+     * <p>
+     * We also assume a piece has valid coordinates between 0 and
      * width * height - 1. Otherwise, we will get an ArrayIndexOutOfBounds Error
      */
     private void storeActivePiece() {
+
         // verify the active piece is non-null
         if (activePiece == null)
             throw new UnsupportedOperationException("Cannot store active piece, currently null.");
 
+        // map coordinates to grid locations and update
         int[] activePieceCoordinates = activePiece.getCoordinates();
         for (int i = 0; i < activePieceCoordinates.length; i++) {
             int entryVal = activePieceCoordinates[i];
@@ -463,8 +499,8 @@ public class TetrisBoard {
 
     /**
      * A private method used to check if there are any rows with every entry
-     * occupied. When this happens, clear the entries, and shift ALL entries
-     * above the deleted line down.
+     * occupied. When this happens, clear the row, and shift all entries
+     * above the deleted row down.
      */
     private void clearLines() {
 
@@ -487,30 +523,9 @@ public class TetrisBoard {
     }
 
     /**
-     * Private helper method called by the clearLines() method.
-     * Checks whether a given row is full.
-     *
-     * @param row the row to check if full
-     * @return boolean indicating true if the row is full, false otherwise
-     */
-    private boolean isRowFull(int row) {
-
-        boolean fullRow = true;
-        int col = 0;
-
-        while (fullRow && col < width) {
-            if (!grid[row][col])
-                fullRow = false;
-            col++;
-        }
-
-        return fullRow;
-    }
-
-    /**
      * Sets the entries in the given row to false, and shifts all entries
      * above down by one row.
-     * @param row the row to start at, then descend
+     * @param row int row to start at, then descend
      */
     private void shiftRowsDown(int row) {
 
@@ -519,6 +534,7 @@ public class TetrisBoard {
             grid[row][i] = false;
             gridColors[row][i] = null;
         }
+
         // shift all other entries down (visually)
         // note that means shifting up in our representation
         for (int shiftRow = row; shiftRow > 1; shiftRow--) {
@@ -529,12 +545,12 @@ public class TetrisBoard {
             }
         }
 
-
     }
 
-// ***************************************************************************
-//   * Piece movement.
-// ***************************************************************************
+
+/* ***************************************************************************
+ *    * Piece Movement
+ ****************************************************************************/
 
     /**
      * Public accessor method used to move the active piece to the left.
@@ -586,16 +602,15 @@ public class TetrisBoard {
 
     /**
      * This general purpose private method attempts to apply the appropriate
-     * motion to the active piece, returning false if the movie causes any
+     * motion to the active piece, returning false if the move causes any
      * collisions.
-     *
      * Note that boundary crossing is checked by the piece itself.
-     *
+     * <p>
      * General Idea:
-     * * (1) create a copy of the piece
-     * * (2) apply the movement to the copy piece
-     * * (3) check the copy piece for collisions
-     * * (4) if no collisions, update activePiece
+     * * (1) Create a copy of the piece
+     * * (2) Apply the movement to the copy piece
+     * * (3) Check the copy piece for collisions
+     * * (4) If no collisions, update activePiece
      *
      * @param movement char describing the type of movement to perform
      * @return true if successful, false if piece cannot move in such a way
@@ -607,23 +622,13 @@ public class TetrisBoard {
 
         // 2 - do the corresponding movement to the piece (if piece itself
         // returns true as well)
-        boolean pieceMoved;
-        switch (movement) {
-            case 'L':
-                pieceMoved = trialPiece.left();
-                break;
-            case 'D':
-                pieceMoved = trialPiece.down();
-                break;
-            case 'R':
-                pieceMoved = trialPiece.right();
-                break;
-            case 'F':
-                pieceMoved = trialPiece.rotate();
-                break;
-            default:
-                throw new IllegalArgumentException("Not a valid movement type: " + movement);
-        }
+        boolean pieceMoved = switch (movement) {
+            case 'L' -> trialPiece.left();
+            case 'D' -> trialPiece.down();
+            case 'R' -> trialPiece.right();
+            case 'F' -> trialPiece.rotate();
+            default -> throw new IllegalArgumentException("Not a valid movement type: " + movement);
+        };
         // we don't need to check for collisions if the piece didn't move
         if (!pieceMoved)
             return false;
@@ -639,14 +644,12 @@ public class TetrisBoard {
     }
 
 
-// ***************************************************************************
-//   * Methods for displaying the board.
-// ***************************************************************************
+/* ***************************************************************************
+ *    * Debug Methods
+ ****************************************************************************/
 
-    /**
-     * Method used to print the board when using the CLI of the game.
-     * @return string representation of the current board grid.
-     */
+    // DEBUG: Used to print board in terminal
+    /*
     public String toString() {
 
         String boardString = "";
@@ -675,15 +678,10 @@ public class TetrisBoard {
 
         return boardString;
     }
+     */
 
-    /**
-     * Private helper method used to check if a grid location (row, col)
-     * is occupied by the activePiece.
-     *
-     * Since the activePiece does not store its coordinates on the board
-     * until a new piece is generated, we need this additional check when
-     * printing / displaying.
-      */
+    // DEBUG: Used to print in toString
+    /*
     private boolean containsPiece(int row, int col) {
 
         if (activePiece == null)
@@ -701,20 +699,21 @@ public class TetrisBoard {
         return false;
 
     }
+     */
 
 
-// ***************************************************************************
-//   * Test Clients
-// ***************************************************************************
+/* ***************************************************************************
+ *    * Test Clients
+ ****************************************************************************/
 
+    // DEBUG: test client
+    /*
     public static void main(String[] args) {
 
         int TEST_HEIGHT = 16;
         int TEST_WIDTH = 8;
 
-
         // CLI TEST CLIENT
-        /*
         Scanner scanner = new Scanner(System.in);
         String input;
         char move = 'x';
@@ -783,19 +782,7 @@ public class TetrisBoard {
                     break;
             }
         } while (move != 'x');
-         */
-
-        TetrisBoard tb = new TetrisBoard(TEST_HEIGHT, TEST_WIDTH);
-
-        tb.setScale(0,0.4,0,0.8);
-
-        System.out.println("Board Display Parameters:");
-        System.out.println("xMin: " + tb.xMin);
-        System.out.println("xMax: " + tb.xMax);
-        System.out.println("yMin: " + tb.yMin);
-        System.out.println("yMax: " + tb.yMax);
-        System.out.println("Grid Square Size: " + tb.gridSquareSize);
-
-
     }
+     */
+
 }
