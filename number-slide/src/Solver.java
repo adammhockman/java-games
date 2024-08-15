@@ -102,6 +102,8 @@ public class Solver {
 
 
 
+
+
     public boolean isSolvable() {
         return solvable;
     }
@@ -154,7 +156,8 @@ public class Solver {
              * Test Client
  ***************************************************************************/
 
-    // test client (see below)
+    // DEBUG: Test Client
+    /*
     public static void main(String[] args) {
 
         // create initial board from file
@@ -164,10 +167,10 @@ public class Solver {
 
         In in = new In(puzzleFileName);
         int n = Integer.parseInt(in.readLine());
-        int[][] tiles = new int[n][n];
+        Tile[][] tiles = new Tile[n][n];
         for (int i = 0; i < n; i++)
             for (int j = 0; j < n; j++)
-                tiles[i][j] = in.readInt();
+                tiles[i][j] = new Tile(in.readInt(), n);
         Board initial = new Board(tiles);
 
         // solve the puzzle
@@ -184,5 +187,6 @@ public class Solver {
 
 
     }
+     */
 
 }

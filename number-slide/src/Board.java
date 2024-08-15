@@ -1,36 +1,35 @@
-/**
- *
- */
+import edu.princeton.cs.algs4.In;
+import edu.princeton.cs.algs4.StdRandom;
 
-import edu.princeton.cs.algs4.Picture;
-
-import java.awt.*;
+import java.awt.Color;
 import java.util.ArrayList;
 import java.util.Iterator;
 
+/**
+ * Class depicting an n x n number slide puzzle board.
+ * Maintains the current state of the game by updating the references
+ * to tiles in an n by n array.
+ */
 public class Board {
 
-    private static final Font NUMBER_FONT = new Font("Courier", Font.BOLD, 32);
+    // the distance between tiles
+    private static final double TILE_BUFFER = 0.10;
 
-    private static final double BOARD_BORDER = 0.0 / 25.0;
-
-    private static final double TILE_BUFFER = 0.02;
-
-    // row x column indexing
-    private final int[][] tiles;
-    private final String[] tileImages;
+    // size of tile grid (number of rows and columns)
     private final int size;
 
-    // cache the location of zero-tile for easy retrieval
+    // (row, col) indexing of tile references
+    private final Tile[][] tiles;
+
+    // cache the location of zero-tile for easy retrieval and animation
     private int zeroRow;
     private int zeroCol;
-    private int swapTile;
 
-    // cache the swap-tile (the tile reference preceeding the most immediate swap)
-    // note this is a deep copy and not a pointer
+    // cache the most recently swapped tile (for drawing with animations)
+    private Tile swapTile;
 
+    // cache the distance used in the A* solver
     private int manhattanDistance;
-    private int hammingDistance;
 
     // used for drawing the board
     private double xBoardMin;
@@ -38,275 +37,308 @@ public class Board {
     private double yBoardMin;
     private double yBoardMax;
 
+    private boolean inverted;
+
     private double gridSquareSize;
 
 /* **************************************************************************
- *            * Constructors *
+ *            * Constructors / Initialization *
  ***************************************************************************/
 
-    public Board(String puzzleFile) {
-
-        // create initial board from file
-        String puzzleFileName = "puzzles/3x3-10.txt";
-
-        In in = new In(puzzleFile);
-        this.size = Integer.parseInt(in.readLine());
-        // this.tiles = new int[size][size];
-        this.tiles = new int[size][size];
-
-        for (int row = 0; row < size; row++)
-            for (int col = 0; col < size; col++) {
-                int val = in.readInt();
-                if (val == 0) {
-                    // System.out.println("Found zero at: row = " + row + ", col = " + col);
-                    zeroRow = row;
-                    zeroCol = col;
-                    // initializie swapTile to 0
-                    swapTile = 0;
-                }
-                tiles[row][col] = val;
-            }
-        tileImages = new String[size * size - 1];
-        for (int i = 0; i < tileImages.length; i++) {
-            String fileName = String.format("tiles/tile%02d.jpeg", i + 1);
-            tileImages[i] = fileName;
-        }
-        cacheDistance();
-    }
-
-    public Board(int size) {
-
-        this.size = size;
-        // this.tiles = new int[size][size];
-        this.tiles = new int[size][size];
-
-        ArrayList<Integer> tileValues = new ArrayList<>();
-        for (int i = 0; i < size * size; i++) {
-            tileValues.add(i);
-        }
-
-        for (int row = 0; row < size; row++) {
-            for (int col = 0; col < size; col++) {
-                int randIndex = StdRandom.uniformInt(tileValues.size());
-                int val = tileValues.remove(randIndex);
-                if (val == 0) {
-                    zeroRow = row;
-                    zeroCol = col;
-                    // initializie swapTile to 0
-                    swapTile = 0;
-                }
-                tiles[row][col] = val;
-            }
-        }
-        tileImages = new String[size * size - 1];
-        for (int i = 0; i < tileImages.length; i++) {
-            String fileName = String.format("tiles/tile%02d.jpeg", i + 1);
-            tileImages[i] = fileName;
-        }
-        cacheDistance();
-    }
-
-    // create a board from an n-by-n array of tiles,
-    // where tiles[row][col] = tile at (row, col)
-    public Board(int[][] tiles) {
+    /**
+     * Main constructor takes an array of Tiles, performs a deep copy,
+     * and instantiates with the copied reference.
+     * @param tiles an array of Tile depicting the board configuration
+     */
+    public Board(Tile[][] tiles) {
 
         // deep copy the input
         this.size = tiles.length;
 
-        // this.tiles = new int[size][size];
-        this.tiles = new int[size][size];
-
+        // deep copy the tiles
+        this.tiles = new Tile[size][size];
         for (int row = 0; row < size; row++) {
             for (int col = 0; col < size; col++) {
-                int val = tiles[row][col];
-                if (val == 0) {
-                    // System.out.println("Found zero at: row = " + row + ", col = " + col);
+                if (tiles[row][col] == null) {
                     zeroRow = row;
                     zeroCol = col;
-                    // initializie swapTile to 0
-                    swapTile = 0;
+                    // initialize swapTile to null
+                    swapTile = null;
+                } else {
+                    this.tiles[row][col] = tiles[row][col].copy();
                 }
-                this.tiles[row][col] = val;
             }
         }
-        tileImages = new String[size * size - 1];
-        for (int i = 0; i < tileImages.length; i++) {
-            String fileName = String.format("tiles/tile%02d.jpeg", i + 1);
-            tileImages[i] = fileName;
-        }
+
+        // default inverted to false
+        this.inverted = false;
+
+        // store the distance used in the Solver A* algorithm
         cacheDistance();
-    }
-
-    // helper method for updating cached distance values
-    private void cacheDistance() {
-
-        this.hammingDistance = calculateHammingDistance();
-        this.manhattanDistance = calculateManhattanDistance();
 
     }
+
+    /**
+     * Constructor takes the name of a board configuration and loads it from
+     * disk.
+     * @param puzzleFile String puzzle file name
+     */
+    public Board(String puzzleFile) {
+
+        In in = new In(puzzleFile);
+        int n = Integer.parseInt(in.readLine());
+
+        this.size = n;
+        this.tiles = new Tile[n][n];
+        for (int i = 0; i < n; i++) {
+            for (int j = 0; j < n; j++) {
+                int entry = in.readInt();
+                if (entry == 0) {
+                    tiles[i][j] = null;
+                    zeroRow = i;
+                    zeroCol = j;
+                    swapTile = null;
+                } else
+                    tiles[i][j] = new Tile(entry, n);
+            }
+        }
+
+        // default inverted to false
+        this.inverted = false;
+
+        // store the distance used in the Solver A* algorithm
+        cacheDistance();
+
+    }
+
+    /**
+     * Method used to set several relevant drawing parameters.
+     * Sets the scale (min and max) for the area where the Board displays.
+     * Also computes the grid square size.
+     *
+     * @param xMin double x-coordinate of left side
+     * @param yMin double y-coordinate of bottom
+     * @param xMax double x-coordinate of right side
+     * @param yMax double y-coordinate of top
+     */
+    public void setScale(double xMin, double yMin, double xMax, double yMax) {
+
+        this.xBoardMin = xMin;
+        this.xBoardMax = xMax;
+        this.yBoardMin = yMin;
+        this.yBoardMax = yMax;
+
+        this.gridSquareSize = (xBoardMax - xBoardMin) / ((double) size);
+
+    }
+
+    /**
+     * Used to flip from inverted to non-inverted when drawing the board.
+     * This is a toggle-switch for the board colors.
+     */
+    public void invert() {
+
+        this.inverted = !inverted;
+
+    }
+
 
 /* **************************************************************************
  *            * Accessor Methods *
  ***************************************************************************/
 
+    /**
+     * Accessor method used to obtain the current row of the zero tile.
+     * @return int row of zero tile
+     */
+    public int getZeroRow() {
 
-    public int getTile(int row, int col) {
+        return zeroRow;
+
+    }
+
+    /**
+     * Accessor method used to obtain the current column of the zero tile.
+     * @return int column of zero tile
+     */
+    public int getZeroCol() {
+
+        return zeroCol;
+
+    }
+
+    /**
+     * Accessor method used to extract a reference to the tile located at
+     * (row, col) provided.
+     * @param row int row value of tile
+     * @param col int column value of tile
+     * @return reference to Tile at that location
+     */
+    public Tile getTile(int row, int col) {
 
         return tiles[row][col];
 
     }
 
-    // string representation of this board
+    /**
+     * Accessor method used to obtain the grid size.
+     * @return int number or rows / columns
+     */
+    public int dimension() {
+
+        return tiles.length;
+
+    }
+
+    /**
+     * Accessor method used to obtain the manhattan distance for the current board.
+     * Manhattan - sum of Manhattan distances between tiles and goal
+     * @return int board manhattan score
+     */
+    public int manhattan() {
+
+        return manhattanDistance;
+
+    }
+
+    // DEBUG: string representation of this board
+    /*
     public String toString() {
         // visual depiction of tile arrangement
-        String tilesString = "";
+        StringBuilder tilesString = new StringBuilder();
 
         // first print the board size on line 1
-        tilesString += Integer.toString(tiles.length) + "\n";
-
+        tilesString.append(tiles.length);
+        tilesString.append("\n");
 
         for (int i = 0; i < tiles.length; i++) {
             for (int j = 0; j < tiles[i].length; j++) {
-                tilesString += tiles[i][j] + " ";
+                if (tiles[i][j] == null)
+                    tilesString.append(String.format("%2d ", 0));
+                else
+                    tilesString.append(String.format("%2d ", tiles[i][j].val()));
             }
-            tilesString += "\n";
+            tilesString.append("\n");
         }
 
-        return tilesString.substring(0, tilesString.length() - 1);
+        return tilesString.toString();
     }
-
-    // board dimension n
-    public int dimension() {
-        // return tiles.length;
-        return tiles.length;
-    }
-
+     */
 
 
 /* **************************************************************************
  *            * Tile Swap Methods *
  ***************************************************************************/
 
-    /*
+    /**
      * Methods attempts to take the tile at location (row, col) and swap with
      * the zero tile (blank space). Returns false if not adjacent to blank.
      *
-     * Should return the tile that was swapped with zero, or null
-     * it the location is already 0
+     * @param row int row of tile to swap with zero tile
+     * @param col int column of tile to swap with zero tile
+     * @return false if the tile can't be swapped, true otherwise
      */
     public boolean zeroSwapTile(int row, int col) {
 
-        // System.out.println("Starting swap operation on Tile:");
-        // System.out.printf("[tile = %d, row = %d, col = %d]\n",tiles[row][col], row, col);
-        // System.out.println("swapTile = " + this.swapTile);
-
         // trivial case: user clicks zero tile - return false
-        if (row == zeroRow && col == zeroCol) {
-            // System.out.println("Swap zero (return)");
+        if (row == zeroRow && col == zeroCol)
             return false;
-        }
 
-        // if the tile is not adjacent tp the zero, return false
-        if (!spaceAdjacent(row, col)) {
-            // System.out.println("Tile not adjacent to zero");
+        // if the tile is not adjacent to zero, return false
+        if (!spaceAdjacent(row, col))
             return false;
-        }
 
-        // at this point we perform the swap operation
-        // cache the tile value being swapped for later reference in animating
+        // at this point we perform the swap operation:
+        // 1 - cache the tile value being swapped for later reference in animating
         swapTile = tiles[row][col];
 
-        // set zero tile to swap value and swap value to 0
+        // 2 - set zero tile to swap value and swap tile location to null
         tiles[zeroRow][zeroCol] = swapTile;
+        tiles[row][col] = null;
 
-        tiles[row][col] = 0;
-
-        // update zero position caching
+        // 3 - update zero position caching
         zeroRow = row;
         zeroCol = col;
 
-        // System.out.println("Updated Zero Row: " + zeroRow);
-        // System.out.println("Updated Zero Col: " + zeroCol);
-
-        // System.out.println("Updated SwapTile: " + swapTile);
-
-        // update hamming and manhattan distances
-        cacheDistance();
-
+        // cacheDistance();
         return true;
 
     }
 
-    // checks it the tile at (row, col) is adjacent to the zero-tile
+    /**
+     * Private helper method used to check it the tile at (row, col) is
+     * adjacent to the zero-tile (blank space)
+     * @param row int row of the tile to check
+     * @param col int column of the tile to check
+     * @return true if tile at (row, col) is adjacent to blank space
+     */
     private boolean spaceAdjacent(int row, int col) {
 
         // check all neighboring boards to see if the zero-tile appears at (row, col)
         for (Board board : neighbors()) {
-            if (board.getTile(row, col) == 0)
+            if (board.getTile(row, col) == null)
                 return true;
         }
         return false;
 
     }
 
+
 /* **************************************************************************
  *            * Iterable Methods *
  ***************************************************************************/
 
-    // all neighboring boards
+    /**
+     * Method used to generate all the "neighbors" of a board.
+     * A "neighbor" is any one of the boards that results from
+     * swapping the blank space with one of the adjacent tiles.
+     * @return Iterable of Boards depicting neighboring moves
+     */
     public Iterable<Board> neighbors() {
 
         return new NeighborsIter();
 
     }
 
+    /**
+     * Private nested class used to define an Iterable for the neighbors()
+     * implementation.
+     * Must provide a way of iterating without altering the current board.
+     */
     private class NeighborsIter implements Iterable<Board> {
 
-        private int n;
         private int totalNeighbors;
         private int currentNeighbor;
-        private int[] neighborRows;
-        private int[] neighborCols;
+        private final int[] neighborRows;
+        private final int[] neighborCols;
 
         private int zeroRow;
         private int zeroCol;
 
+        // constructor
         private NeighborsIter() {
 
-            this.n = tiles.length;
             this.totalNeighbors = 0;
             this.currentNeighbor = 0;
             this.neighborRows = new int[4];
             this.neighborCols = new int[4];
 
             // first we need to determine the row and column of the "0" entry
-            // initialize at a position outside the board to future-proof issues
-            // where the zero entry is missing
-            this.zeroRow = n + 1;
-            this.zeroCol = n + 1;
+            this.zeroRow = -1;
+            this.zeroCol = -1;
 
-            for (int row = 0; row < tiles.length; row++) {
-                for (int col = 0; col < tiles[row].length; col++) {
-                    if (tiles[row][col] == 0) {
+            for (int row = 0; row < size; row++) {
+                for (int col = 0; col < size; col++) {
+                    if (tiles[row][col] == null) {
                         this.zeroRow = row + 1;
                         this.zeroCol = col + 1;
                     }
                 }
             }
 
-
         }
 
         public Iterator<Board> iterator() {
-
-            /*
-            // debug statements
-            System.out.println("Constructing new iterator.");
-            System.out.println("Zero Entry: ( " + zeroRow + ", " + zeroCol + ")");
-            System.out.println();
-
-             */
-
 
             // store the location of the row positions for each neighbor
             // determine the number of neighbors based on row / column logic
@@ -315,189 +347,78 @@ public class Board {
             // left neighbor
             neighborRow = zeroRow;
             neighborCol = zeroCol - 1;
-
-            /*
-            // debug statements
-            System.out.println("Considering Neighbor LEFT:");
-            System.out.println("(row, col) = ( " + neighborRow + ", " + neighborCol + ")");
-
-             */
-
             if (isValidTileLocation(neighborRow, neighborCol)) {
-                // System.out.println("Neighbor Location: VALID");
                 neighborRows[totalNeighbors] = neighborRow;
                 neighborCols[totalNeighbors] = neighborCol;
                 totalNeighbors++;
             }
-            /*
-            // debug statements
-            else {
-                System.out.println("Neighbor Location: INVALID");
-            }
-            System.out.println();
-
-             */
 
             // right neighbor
             neighborRow = zeroRow;
             neighborCol = zeroCol + 1;
-
-            /*
-            / debug statements
-            System.out.println("Considering Neighbor RIGHT:");
-            System.out.println("(row, col) = ( " + neighborRow + ", " + neighborCol + ")");
-
-             */
-
             if (isValidTileLocation(neighborRow, neighborCol)) {
-                // System.out.println("Neighbor Location: VALID");
                 neighborRows[totalNeighbors] = neighborRow;
                 neighborCols[totalNeighbors] = neighborCol;
                 totalNeighbors++;
             }
-            /*
-                    // debug statements
-            else {
-                System.out.println("Neighbor Location: INVALID");
-            }
-            System.out.println();
-
-             */
 
             // top neighbor
             neighborRow = zeroRow - 1;
             neighborCol = zeroCol;
-
-            /*
-                    // debug statements
-            System.out.println("Considering Neighbor TOP:");
-            System.out.println("(row, col) = ( " + neighborRow + ", " + neighborCol + ")");
-
-             */
-
             if (isValidTileLocation(neighborRow, neighborCol)) {
                 // System.out.println("Neighbor Location: VALID");
                 neighborRows[totalNeighbors] = neighborRow;
                 neighborCols[totalNeighbors] = neighborCol;
                 totalNeighbors++;
             }
-            /*
-                    // debug statements
-            else {
-                System.out.println("Neighbor Location: INVALID");
-            }
-            System.out.println();
-
-             */
 
             // bottom neighbor
             neighborRow = zeroRow + 1;
             neighborCol = zeroCol;
-
-            // System.out.println("Considering Neighbor BOTTOM:");
-            // System.out.println("(row, col) = ( " + neighborRow + ", " + neighborCol + ")");
-
             if (isValidTileLocation(neighborRow, neighborCol)) {
                 // System.out.println("Neighbor Location: VALID");
                 neighborRows[totalNeighbors] = neighborRow;
                 neighborCols[totalNeighbors] = neighborCol;
                 totalNeighbors++;
             }
-            else {
-                //    System.out.println("Neighbor Location: INVALID");
-            }
-            // System.out.println();
 
             // set current neighbor to 1 (we are labelling neighbors 1 -> n)
-            if (totalNeighbors > 0) {
+            if (totalNeighbors > 0)
                 currentNeighbor = 1;
-            }
 
-            /*
-            // debug statements
-            System.out.println("Preparing to create Iterator object.");
-            System.out.println("Total Neighbors  : " + totalNeighbors);
-            System.out.println("Current Neighbor : " + currentNeighbor);
-            System.out.println("Neighbor Rows    : " + Arrays.toString(neighborRows));
-            System.out.println("Neighbor Columns : " + Arrays.toString(neighborCols));
-
-             */
-
-
-            Iterator<Board> iter = new Iterator<Board>() {
+            return new Iterator<>() {
 
                 public boolean hasNext() {
 
-                    /*
-                    // debug statements
-                    System.out.println("Calling \"hasNext()\"");
-                    System.out.println("Current Neighbor : " + currentNeighbor);
-                    System.out.println("Total Neighbors  : " + totalNeighbors);
-
-                     */
-
-
-                    if (totalNeighbors == 0) {
-                        // (debug) System.out.println("totalNeighbors == 0");
+                    if (totalNeighbors == 0)
                         return false;
-                    }
-                    else if (currentNeighbor > totalNeighbors) {
-                        // (debug) System.out.println("currentNeighbor == totalNeighbors");
-                        return false;
-                    }
-                    else {
-                        // (debug) System.out.println("returning 'true'");
+                    else
+                        return (currentNeighbor <= totalNeighbors);
 
-                        return true;
-                    }
                 }
 
                 public Board next() {
 
-                    /*
-                    // debug statements
-                    System.out.println("Calling \"next()\"");
-                    System.out.println("Current Neighbor : " + currentNeighbor);
-                    System.out.println("Total Neighbors  : " + totalNeighbors);
-                     */
-
                     int neighborRow = neighborRows[currentNeighbor - 1];
                     int neighborCol = neighborCols[currentNeighbor - 1];
-
-                    Board nextBoard = swap(neighborRow, neighborCol);
-
                     currentNeighbor++;
 
-                    /*
-                    // debug statements
-                    System.out.println("Checking to see if incremented");
-                    System.out.println("Current Neighbor : " + currentNeighbor);
-                    System.out.println("Total Neighbors  : " + totalNeighbors);
+                    return swap(neighborRow, neighborCol);
 
-                     */
-
-
-                    return nextBoard;
                 }
 
                 // private helper method used to create a new Board that has the
                 // zero entry swapped with the entry at the row and col provided
                 private Board swap(int row, int col) {
 
-                    /*
-                    // debug statements
-                    System.out.println("Creating Board inside iterator.");
-                    System.out.println(
-                            "Swapping zero entry with (row, col) = (" + row + ", " + col + ")");
-                     */
-
-
-                    // create a new tiles arrangement and copy from the Board
-                    int[][] swapTiles = new int[n][n];
-                    for (int i = 0; i < n; i++) {
-                        for (int j = 0; j < n; j++) {
-                            swapTiles[i][j] = tiles[i][j];
-
+                    // create a new tile arrangement and copy from the Board
+                    Tile[][] swapTiles = new Tile[size][size];
+                    for (int i = 0; i < size; i++) {
+                        for (int j = 0; j < size; j++) {
+                            if (tiles[i][j] != null)
+                                swapTiles[i][j] = tiles[i][j].copy();
+                            else
+                                swapTiles[i][j] = null;
                         }
                     }
 
@@ -505,170 +426,128 @@ public class Board {
                     swapTiles[zeroRow - 1][zeroCol - 1] = swapTiles[row - 1][col - 1];
 
                     // put the zero entry where (row, col) is entry from above
-                    swapTiles[row - 1][col - 1] = 0;
+                    swapTiles[row - 1][col - 1] = null;
 
-                    Board swapBoard = new Board(swapTiles);
-                    /*
-                    // debug statements
-                    System.out.println("Returning the following Board:");
-                    System.out.println(swapBoard);
-
-                     */
-
-                    return swapBoard;
+                    return new Board(swapTiles);
 
                 }
-
             };
-
-            return iter;
         }
 
         // private helper method used to determine if a given row and col
         // correspond to a corner location
         private boolean isValidTileLocation(int row, int col) {
 
-            boolean validRow = (1 <= row) && (row <= n);
-            boolean validCol = (1 <= col) && (col <= n);
+            boolean validRow = (1 <= row) && (row <= size);
+            boolean validCol = (1 <= col) && (col <= size);
 
             return (validRow && validCol);
         }
 
     }
 
-    // a board that is obtained by exchanging any pair of tiles
-    // note that the zero entry does not count as a tile
+    /**
+     * Used to obtain a twin of the instance board.
+     * A twin is any board that is obtained by exchanging any pair of tiles.
+     * Note: The zero entry (blank space) does not count as a tile
+     * @return reference to a twin Board
+     */
     public Board twin() {
 
-        int n = tiles.length;
-        int[][] twinTiles = new int[n][n];
-        for (int i = 0; i < n; i++) {
-            for (int j = 0; j < n; j++) {
-                twinTiles[i][j] = tiles[i][j];
+        Tile[][] twinTiles = new Tile[size][size];
+        for (int i = 0; i < size; i++) {
+            for (int j = 0; j < size; j++) {
+                if (tiles[i][j] != null)
+                    twinTiles[i][j] = tiles[i][j].copy();
+                else
+                    twinTiles[i][j] = null;
             }
         }
 
         // try to swap the first two entries, unless one of them is the zero entry,
         // then swap the last two entries
-
         int swapRow1 = 0;
         int swapRow2 = 0;
 
         int swapCol1 = 0;
         int swapCol2 = 1;
 
-        if (tiles[swapRow1][swapCol1] == 0 || tiles[swapRow2][swapCol2] == 0) {
-            swapRow1 = n - 1;
-            swapRow2 = n - 1;
-            swapCol1 = n - 2;
-            swapCol2 = n - 1;
+        if (tiles[swapRow1][swapCol1] == null || tiles[swapRow2][swapCol2] == null) {
+            swapRow1 = size - 1;
+            swapRow2 = size - 1;
+            swapCol1 = size - 2;
+            swapCol2 = size - 1;
         }
 
         // perform the swap operation
-        int tmp = twinTiles[swapRow1][swapCol1];
+        Tile tmp = twinTiles[swapRow1][swapCol1];
         twinTiles[swapRow1][swapCol1] = twinTiles[swapRow2][swapCol2];
         twinTiles[swapRow2][swapCol2] = tmp;
 
-        Board twinBoard = new Board(twinTiles);
-
-        return twinBoard;
+        return new Board(twinTiles);
 
     }
+
 
 /* **************************************************************************
- *            * Drawing Methods *
+ *            * Simple Drawing Methods *
  ***************************************************************************/
 
+    /**
+     * Main draw method. Called by the ambient display and writes to StdDraw
+     */
     public void draw() {
-        drawOuterGrid();
-        drawGridSquares();
+
+        // DEBUG - draw grid layout
+        // drawOuterGrid();
+
+        // draw grid squares
+        for (int row = 0; row < size; row++) {
+            for (int col = 0; col < size; col++)
+                drawTile(row, col);
+        }
+
     }
 
+    /**
+     * Private helper method used to draw individual tile at the location provided.
+     * Basic design: gold border and text, black inside
+     * Inverted basic design: black border and text, gold inside
+     *
+     * @param row int row of tile to be drawn
+     * @param col int column of tile to be drawn
+     */
+    private void drawTile(int row, int col) {
+
+        if (tiles[row][col] == null)
+            return;
+
+        double squareHalfSize = 0.5 * gridSquareSize;
+        double xCenter = xBoardMin + squareHalfSize + col * gridSquareSize;
+        double yCenter = yBoardMax - squareHalfSize - row * gridSquareSize;
+
+        tiles[row][col].draw(xCenter, yCenter, gridSquareSize * (1.0 - TILE_BUFFER), inverted);
+
+    }
+
+    
+/* **************************************************************************
+ *            * Animated Drawing Methods *
+ ***************************************************************************/
+
+    // ANIMATED
+    /*
     public void animatedDraw(double t) {
 
-        // System.out.println();
-        // System.out.printf("Starting new animatedDraw(t = %.2f)\n", t);
         drawOuterGrid();
         drawAnimatedGridSquares(t);
 
     }
+     */
 
-    private void drawOuterGrid() {
-
-        StdDraw.setPenColor(Color.BLACK);
-        StdDraw.setPenRadius(0.002);
-
-        // first draw rows
-        for (int row = 0; row <= size; row++) {
-            double y = yBoardMin + row * gridSquareSize;
-            StdDraw.line(xBoardMin, y, xBoardMax, y);
-        }
-
-        // then draw columns
-        for (int col = 0; col <= size; col++) {
-            double x = xBoardMin + col * gridSquareSize;
-            StdDraw.line(x, yBoardMin, x, yBoardMax);
-        }
-
-    }
-
-    private void drawGridSquares() {
-
-        for (int row = 0; row < size; row++) {
-            for (int col = 0; col < size; col++) {
-                drawTile(row, col);
-            }
-        }
-
-    }
-
-    private void drawAnimatedGridSquares(double t) {
-
-        // System.out.printf("Drawing Animated Grid Squares (t = %.2f)\n",t);
-
-        for (int row = 0; row < size; row++) {
-            for (int col = 0; col < size; col++) {
-                // System.out.printf("Drawing: [ tile = %d, row = %d, col = %d ]\n", tiles[row][col], row, col);
-                // check if this is the swap tile
-                if (swapTile == tiles[row][col]) {
-                    // System.out.println("Drawing Swap Tile: " + swapTile);
-                    drawAnimatedTile(row, col, t);
-                } else {
-                    // System.out.println("Drawing normally.");
-                    drawTile(row, col);
-
-                }
-
-            }
-        }
-
-    }
-
-    private void drawTile(int row, int col) {
-
-        if (tiles[row][col] == 0)
-            return;
-
-        double squareHalfSize = 0.5 * gridSquareSize;
-        double xSquareCenter = xBoardMin + squareHalfSize + col * gridSquareSize;
-        double ySquareCenter = yBoardMax - squareHalfSize - row * gridSquareSize;
-
-        // System.out.println("drawing tile : " + tiles[row][col]);
-        // System.out.println("image file   : " + tileImages[tiles[row][col] - 1]);
-        drawTileXY(tileImages[tiles[row][col] - 1], xSquareCenter, ySquareCenter);
-
-
-    }
-
-    private void drawAnimatedTile(int row, int col, double t) {
-
-        // System.out.printf("Draw Animated Tile (t = %.2f)\n",t);
-        // System.out.printf("[ tile = %d, row = %d, col = %d ]\n", tiles[row][col], row, col);
-
-        if (tiles[row][col] == 0) {
-            // System.out.println("Tile value zero. Returning.");
-            return;
-        }
+    // ANIMATED METHOD
+    /*
+    private void drawValue(double t) {
 
         double squareHalfSize = 0.5 * gridSquareSize;
 
@@ -696,332 +575,267 @@ public class Board {
 
         drawTileXY(tileImages[tiles[row][col] - 1], x, y);
 
-
     }
+    */
 
-    private void drawTileXY(String tileImage, double x, double y) {
-
-        // draw tile outline
-        double picSize = gridSquareSize - TILE_BUFFER;
-        StdDraw.picture(x, y, tileImage, picSize, picSize);
-
-        /*
-        StdDraw.setPenColor();
-        StdDraw.setPenRadius(0.01);
-        StdDraw.filledSquare(x, y, size - TILE_BUFFER);
-
-
-
-        // label tile number
-        if (val == 0)
-            return;
+    // DEBUG - testing the layout
+    /*
+    private void drawOuterGrid() {
 
         StdDraw.setPenColor(Color.BLACK);
-        StdDraw.setFont(NUMBER_FONT);
-        StdDraw.text(x, y, Integer.toString(val));
+        StdDraw.setPenRadius(0.002);
 
-         */
+        // first draw rows
+        for (int row = 0; row <= size; row++) {
+            double y = yBoardMin + row * gridSquareSize;
+            StdDraw.line(xBoardMin, y, xBoardMax, y);
+        }
 
-    }
-
-    public void setScale(double xMin, double yMin, double xMax, double yMax) {
-
-        // System.out.println("yMax - yMin = " + (yMax - yMin));
-        // System.out.println("xMax - xMin = " + (xMax - xMin));
-        // if ((yMax - yMin) != (xMax - xMin))
-        //     throw new IllegalArgumentException("Must use coordinates with a 1:1 ratio");
-
-        this.xBoardMin = xMin + BOARD_BORDER;
-        this.xBoardMax = xMax - BOARD_BORDER;
-        this.yBoardMin = yMin + BOARD_BORDER;
-        this.yBoardMax = yMax - BOARD_BORDER;
-
-        this.gridSquareSize = (xBoardMax - xBoardMin) / 3.0;
+        // then draw columns
+        for (int col = 0; col <= size; col++) {
+            double x = xBoardMin + col * gridSquareSize;
+            StdDraw.line(x, yBoardMin, x, yBoardMax);
+        }
 
     }
+     */
+
+    // ANIMATED
+    /*
+    private void drawAnimatedGridSquares(double t) {
+
+        // System.out.printf("Drawing Animated Grid Squares (t = %.2f)\n",t);
+
+        for (int row = 0; row < size; row++) {
+            for (int col = 0; col < size; col++) {
+                // System.out.printf("Drawing: [ tile = %d, row = %d, col = %d ]\n", tiles[row][col], row, col);
+                // check if this is the swap tile
+                if (swapTile == tiles[row][col]) {
+                    // System.out.println("Drawing Swap Tile: " + swapTile);
+                    drawAnimatedTile(row, col, t);
+                } else {
+                    // System.out.println("Drawing normally.");
+                    drawTile(row, col);
+
+                }
+
+            }
+        }
+
+    }
+     */
+
+
+
+
+    // ANIMATED
+    /*
+    private void drawAnimatedTile(int row, int col, double t) {
+
+        if (tiles[row][col] == null) {
+            return;
+        }
+
+        tiles[row][col].drawAnimated(t);
+
+    }
+     */
 
 
 /* **************************************************************************
  *            * Distance Methods *
  ***************************************************************************/
 
-
-    // number of tiles out of place
-    public int hamming() {
-        return hammingDistance;
-    }
-
-    // sum of Manhattan distances between tiles and goal
-    public int manhattan() {
-        return manhattanDistance;
-    }
-
-    // private helper method used to calculate hamming distance once and cache
-    private int calculateHammingDistance() {
-        int count = 0;
-        int n = tiles.length;
-        for (int row = 0; row < n; row++) {
-            for (int col = 0; col < tiles[row].length; col++) {
-                // calculate the "correct" entry based on indices
-                int goalEntry = n * row + col + 1;
-
-                /*
-                if (goalEntry != n * n && tiles[row][col] != goalEntry) {
-                    count++;
-                }
-                 */
-
-                if (goalEntry != n * n && tiles[row][col] != goalEntry) {
-                    count++;
-                }
-
-            }
-        }
-        return count;
-    }
-
-    // private helper method used to calculate hamming distance once and cache
-    private int calculateManhattanDistance() {
+    /**
+     * Public method called by the constructor and update methods to cache the
+     * A* search algorithm distance heuristic.
+     * This implementation uses the manhattan distance.
+     * The manhattan distance of a board is the sum of the individual tile
+     * manhattan distances.
+     */
+    public void cacheDistance() {
 
         int totalDistance = 0;
 
         // sum the distance for each tile in the board
-        for (int i = 0; i < tiles.length; i++) {
-            for (int j = 0; j < tiles[i].length; j++) {
-                totalDistance += manhattanTileDistance(i + 1, j + 1);
-            }
+        for (int i = 0; i < size; i++) {
+            for (int j = 0; j < size; j++)
+                totalDistance += manhattanTileDistance(i, j);
         }
 
-        return totalDistance;
+        this.manhattanDistance = totalDistance;
 
     }
 
-    // private method used to calculate the manhattan distance for the tile at
-    // the row and column provided
+    /**
+     * Private helper method used to calculate the manhattan distance of a single
+     * tile location.
+     *
+     * @param row int row of tile to calculate
+     * @param col int column of tile to calculate
+     * @return int manhattan distance of tile at (row,col)
+     */
     private int manhattanTileDistance(int row, int col) {
 
-        // int val = tiles[row - 1][col - 1];
-        int val = tiles[row - 1][col - 1];
-        // int n = tiles.length;
-        int n = tiles.length;
-
-        // check for 0 - n^2 condition
-        if (val == 0) {
+        // check for zero tile (empty space) location
+        if (tiles[row][col] == null)
             return 0;
-        }
 
-        int goalRow = 1 + (val - 1) / n;
-        int goalCol = 1 + (val - 1) % n;
+        // subtract 1 to account for empty space coming last and 1 going first
+        int val = tiles[row][col].val() - 1;
 
-        int dist = Math.abs(row - goalRow) + Math.abs(col - goalCol);
+        // get distance from goal horizontally and vertically
+        int goalRow = val / size;
+        int goalCol = val % size;
 
-        return dist;
+        return Math.abs(row - goalRow) + Math.abs(col - goalCol);
+
     }
 
-    // is this board the goal board?
+    /**
+     * Used to establish equality between the current board state and the goal state.
+     * @return true if the goal is in the target position
+     */
     public boolean isGoal() {
 
-        int n = tiles.length;
-
-        for (int row = 0; row < n; row++) {
-            for (int col = 0; col < tiles[row].length; col++) {
+        for (int row = 0; row < size; row++) {
+            for (int col = 0; col < size; col++) {
                 // calculate the "correct" entry based on indices
-                int goalEntry = n * row + col + 1;
-                // check for "zero" entry
-                if (goalEntry == n * n) {
-                    goalEntry = 0;
-                }
+                // shift 1 to account for empty space going last
+                int goalEntry = (size * row + col) + 1;
 
-                if (tiles[row][col] != goalEntry) {
+                // we don't check the final location (empty space)
+                if (goalEntry == size * size)
+                    break;
+
+                // if the Tile is null (i.e. the empty space) before the final
+                // index, return false
+                if (tiles[row][col] == null)
                     return false;
-                }
+
+                // finally check based on value
+                if (tiles[row][col].val() != goalEntry)
+                    return false;
             }
         }
         return true;
     }
 
-    // does this board equal y?
+    /**
+     * Used to compare two board instances to see if their tile configurations are the same.
+     * Used in the Solver algorithm to optimize performance.
+     * @param y Object is cast immediately to type Board
+     * @return true if tile configurations are identical (based on tile values)
+     */
     public boolean equals(Object y) {
 
-        Board yBoard;
-
-        if (y == null) {
+        // cast y to type Board
+        if (y == null || !y.getClass().equals(Board.class))
             return false;
-        }
+        Board yBoard = (Board) y;
 
-        if (y.getClass().equals(Board.class)) {
-            // try to cast the generic argument to a Board
-            try {
-                yBoard = (Board) y;
-            }
-            catch (ClassCastException e) {
-                System.out.println("There was a problem with the Board provided to equals()");
-                return false;
-            }
-        }
-        else {
+        // check size compatibility
+        if (size != yBoard.dimension())
             return false;
-        }
 
-        if (tiles.length != yBoard.dimension()) {
-            return false;
-        }
+        // compare each tile by value
+        for (int row = 0; row < size; row++) {
+            for (int col = 0; col < size; col++) {
+                Tile a = tiles[row][col];
+                Tile b = yBoard.getTile(row, col);
 
-
-        // compare each tile
-        for (int row = 0; row < tiles.length; row++) {
-            for (int col = 0; col < tiles[row].length; col++) {
-                if (tiles[row][col] != yBoard.getTile(row, col)) {
-                    return false;
+                // if either is null, but both aren't
+                if (a == null || b == null) {
+                    if (!(a == null && b == null))
+                        return false;
                 }
+                else if (a.val() != b.val())
+                    return false;
             }
         }
-
         return true;
 
     }
-
 
 
 /* **************************************************************************
- *            * Test Client *
- ***************************************************************************/
-    public static void main(String[] args) {
-        /*
-        // initialize arrangements and goal board
-        Board goalBoard = setUpArrangements(0);
-        Board board1 = setUpArrangements(1);
-        Board board2 = setUpArrangements(2);
-        Board board3 = setUpArrangements(3);
-        // ---------------------------------------------------------------------
+ *    Static methods
+ * *************************************************************************/
 
-        // display board arrangements
-        System.out.println("Goal Board:");
-        System.out.println(goalBoard);
-        System.out.println();
-        System.out.println("Board 1 Arrangement:");
-        System.out.println(board1);
-        System.out.println();
-        System.out.println("Board 2 Arrangement:");
-        System.out.println(board2);
-        System.out.println();
-        System.out.println("Board 3 Arrangement:");
-        System.out.println(board3);
-        System.out.println();
-        // ---------------------------------------------------------------------
+    /**
+     * Used to generate a (**solvable**) new board of size provided.
+     * Random in the 3x3 case, but pre-computed in the 4x4 and 5x5 case
+     * @param size int grid size number of rows and columns
+     * @return Board reference to new board created
+     */
+    public static Board createBoard(int size) {
 
-        // check individual logic methods
-        System.out.println("Checking attributes:");
-        System.out.println("Goal Dimension  : " + goalBoard.dimension());
-        System.out.println("Arr1?Goal Board : " + board1.isGoal());
-        System.out.println("Goal?Goal Board : " + goalBoard.isGoal());
-        System.out.println("Arr1 == Goal ?  : " + board1.equals(goalBoard));
-        System.out.println("Arr1 == Arr2 ?  : " + board1.equals(board2));
-        System.out.println("Arr1 == Arr3 ?  : " + board1.equals(board3));
-        System.out.println();
-        // ---------------------------------------------------------------------
+        Tile[][] tiles = new Tile[size][size];
+        int TOTAL_BOARDS = 100;
 
-        System.out.println("Hamming Scores:");
-        System.out.println("Goal Board Score : " + goalBoard.hamming());
-        System.out.println("Board 1 Score    : " + board1.hamming());
-        System.out.println("Board 2 Score    : " + board2.hamming());
-        System.out.println("Board 3 Score    : " + board3.hamming());
-        System.out.println();
-        // ---------------------------------------------------------------------
-
-        System.out.println("Manhattan Scores:");
-        System.out.println("Individual Manhattan Tile Scores");
-        int mDistG = goalBoard.manhattanTileDistance(2, 3);
-        int mDist1 = board1.manhattanTileDistance(1, 2);
-        int mDist2 = board2.manhattanTileDistance(3, 3);
-        int mDist3A = board3.manhattanTileDistance(1, 2);
-        int mDist3B = board3.manhattanTileDistance(3, 1);
-
-        System.out.println("Goal  (2,3) : " + mDistG + "  [Val: " + goalBoard.tiles[1][2] + "]");
-        System.out.println("Board1(1,2) : " + mDist1 + "  [Val: " + board1.tiles[0][1] + "]");
-        System.out.println("Board2(3,3) : " + mDist2 + "  [Val: " + board2.tiles[2][2] + "]");
-        System.out.println("Board3(1,2) : " + mDist3A + "  [Val: " + board3.tiles[0][1] + "]");
-        System.out.println("Board3(3,1) : " + mDist3B + "  [Val: " + board3.tiles[2][0] + "]");
-        // ---------------------------------------------------------------------
-
-        System.out.println("----------------------------------");
-        System.out.println("Board Level Manhattan Scores");
-        System.out.println("Goal Board Score : " + goalBoard.manhattan());
-        System.out.println("Board 1 Score    : " + board1.manhattan());
-        System.out.println("Board 2 Score    : " + board2.manhattan());
-        System.out.println("Board 3 Score    : " + board3.manhattan());
-        System.out.println();
-        // ---------------------------------------------------------------------
-
-        System.out.println("Checking the twin() method");
-        System.out.println("Goal Board Twin 1:");
-        System.out.println(goalBoard.twin());
-        System.out.println("Goal Board Twin 2:");
-        System.out.println(goalBoard.twin());
-        System.out.println("Board 2 Twin:");
-        System.out.println(board2.twin());
-        // ---------------------------------------------------------------------
-
-        System.out.println("Goal Board:");
-        System.out.println(goalBoard);
-        System.out.println();
-
-        System.out.println("Goal Board Neighbors:");
-        Iterable<Board> goalNeighbors = goalBoard.neighbors();
-
-        for (Board nbr : goalNeighbors) {
-            System.out.println(nbr);
+        if (size == 5) {
+            int puzzleNumber = StdRandom.uniformInt(TOTAL_BOARDS);
+            String puzzleFile = String.format("puzzles/puzzle5x5/medium/puzzle5x5_medium%02d.txt", puzzleNumber);
+            return new Board(puzzleFile);
         }
-        System.out.println();
-        // ---------------------------------------------------------------------
 
-        System.out.println("Board 1:");
-        System.out.println(board1);
-        System.out.println();
-
-        System.out.println("Board 1 Neighbors:");
-        Iterable<Board> board1Neighbors = board1.neighbors();
-
-        for (Board nbr : board1Neighbors) {
-            System.out.println(nbr);
+        if (size == 4) {
+            int totalBoards = 74;
+            int puzzleNumber = StdRandom.uniformInt(totalBoards) + 1;
+            String puzzleFile = String.format("puzzles/puzzle4x4/medium/puzzle4x4_medium%02d.txt", puzzleNumber);
+            return new Board(puzzleFile);
         }
-        System.out.println();
-        // ---------------------------------------------------------------------
 
-        System.out.println("Board 2:");
-        System.out.println(board2);
-        System.out.println();
+        if (size == 3) {
+            ArrayList<Integer> tileValues = new ArrayList<>();
+            for (int i = 0; i < size * size; i++) {
+                tileValues.add(i);
+            }
 
-        System.out.println("Board 2 Neighbors:");
-        Iterable<Board> board2Neighbors = board2.neighbors();
+            for (int row = 0; row < size; row++) {
+                for (int col = 0; col < size; col++) {
+                    int randIndex = StdRandom.uniformInt(tileValues.size());
+                    int val = tileValues.remove(randIndex);
+                    if (val == 0)
+                        tiles[row][col] = null;
+                    else
+                        tiles[row][col] = new Tile(val, size);
+                }
+            }
 
-        for (Board nbr : board2Neighbors) {
-            System.out.println(nbr);
+            Board testBoard = new Board(tiles);
+            Solver solver = new Solver(testBoard);
+            if (!solver.isSolvable())
+                testBoard = testBoard.twin();
+
+            return testBoard;
         }
-        System.out.println();
-        // ---------------------------------------------------------------------
 
-        System.out.println("Board 3:");
-        System.out.println(board3);
-        System.out.println();
+        return null;
 
-        System.out.println("Board 3 Neighbors:");
-        Iterable<Board> board3Neighbors = board3.neighbors();
-
-        for (Board nbr : board3Neighbors) {
-            System.out.println(nbr);
-        }
-        System.out.println();
-
-         */
-
-        Board b = new Board("puzzles/puzzle3x3-10.txt");
-        System.out.println(b);
-
-        b.zeroSwapTile(1,0);
-        System.out.println(b);
-
-        b.zeroSwapTile(0,1);
-        System.out.println(b);
     }
+
+    /**
+     * Private helper method used to generate new puzzle boards.
+     * Creates a game board in the goal position. This can then
+     * be used to perform random swaps to achieve different boards
+     * of various difficulty level.
+     * @param size int number of rows and columns
+     * @return reference to the goal board
+     */
+    public static Board identity(int size) {
+
+        Tile[][] tiles = new Tile[size][size];
+
+        for (int row = 0; row < size; row++) {
+            for (int col = 0; col < size; col++) {
+                int goalEntry = row * size + col + 1;
+                tiles[row][col] = new Tile(goalEntry, size);
+            }
+        }
+        tiles[size-1][size-1] = null;
+        return new Board(tiles);
+
+    }
+
 }
