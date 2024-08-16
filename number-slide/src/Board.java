@@ -1,7 +1,6 @@
 import edu.princeton.cs.algs4.In;
 import edu.princeton.cs.algs4.StdRandom;
 
-import java.awt.Color;
 import java.util.ArrayList;
 import java.util.Iterator;
 
@@ -40,6 +39,7 @@ public class Board {
     private boolean inverted;
 
     private double gridSquareSize;
+
 
 /* **************************************************************************
  *            * Constructors / Initialization *
@@ -200,30 +200,6 @@ public class Board {
         return manhattanDistance;
 
     }
-
-    // DEBUG: string representation of this board
-    /*
-    public String toString() {
-        // visual depiction of tile arrangement
-        StringBuilder tilesString = new StringBuilder();
-
-        // first print the board size on line 1
-        tilesString.append(tiles.length);
-        tilesString.append("\n");
-
-        for (int i = 0; i < tiles.length; i++) {
-            for (int j = 0; j < tiles[i].length; j++) {
-                if (tiles[i][j] == null)
-                    tilesString.append(String.format("%2d ", 0));
-                else
-                    tilesString.append(String.format("%2d ", tiles[i][j].val()));
-            }
-            tilesString.append("\n");
-        }
-
-        return tilesString.toString();
-    }
-     */
 
 
 /* **************************************************************************
@@ -530,116 +506,64 @@ public class Board {
 
     }
 
-    
+
 /* **************************************************************************
  *            * Animated Drawing Methods *
  ***************************************************************************/
 
-    // ANIMATED
-    /*
-    public void animatedDraw(double t) {
-
-        drawOuterGrid();
-        drawAnimatedGridSquares(t);
-
-    }
+    /**
+     * Main draw method when using ANIMATIONS. This toggle is set in the
+     * NumberDisplay class.
+     * Draws the result of a swap at proportion t of the total swap time.
+     *
+     * @param t the proportion of the swap progression to be shown
      */
+    public void drawAnimated(double t) {
 
-    // ANIMATED METHOD
-    /*
-    private void drawValue(double t) {
+        // draw grid squares animated
+        for (int row = 0; row < size; row++) {
+            for (int col = 0; col < size; col++) {
+                if (tiles[row][col] != null && tiles[row][col].val() == swapTile.val())
+                    drawTileAnimated(row, col, t);
+                else
+                    drawTile(row, col);
+            }
+        }
+    }
 
-        double squareHalfSize = 0.5 * gridSquareSize;
+    /**
+     * Private helper method called when using ANIMATIONS.
+     * Draws the tile at location (endRow, endCol).
+     * If the tile is the swapTile, then it draws the tile swap progression
+     * at time proportion t.
+     * Think: START-POS + t * (END-POS - START-POS)
+     *
+     * @param endRow the ending position row of swap tile
+     * @param endCol the ending position column of swap tile
+     * @param t proportion of swap progression to draw
+     */
+    private void drawTileAnimated(int endRow, int endCol, double t) {
+
+        double halfWidth = 0.5 * gridSquareSize;
 
         // start position - current position of zero tile
         int startRow = this.zeroRow;
         int startCol = this.zeroCol;
-        // System.out.printf("start row : %d, start col : %d", startRow, startCol);
-
-        // end position - current tile position at (row, col)
-        int endRow = row;
-        int endCol = col;
-        // System.out.printf("end row : %d, end col : %d", endRow, endCol);
 
         // convert to (x,y) coordinates
-        double xStart = xBoardMin + squareHalfSize + startCol * gridSquareSize;
-        double yStart = yBoardMax - squareHalfSize - startRow * gridSquareSize;
+        double xStart = xBoardMin + halfWidth + startCol * gridSquareSize;
+        double yStart = yBoardMax - halfWidth - startRow * gridSquareSize;
 
-        double xEnd = xBoardMin + squareHalfSize + endCol * gridSquareSize;
-        double yEnd = yBoardMax - squareHalfSize - endRow * gridSquareSize;
+        double xEnd = xBoardMin + halfWidth + endCol * gridSquareSize;
+        double yEnd = yBoardMax - halfWidth - endRow * gridSquareSize;
 
         // take proportion t of distance from start to end
-        double x = xStart + t * (xEnd - xStart);
-        double y = yStart + t * (yEnd - yStart);
+        double xCenter = xStart + t * (xEnd - xStart);
+        double yCenter = yStart + t * (yEnd - yStart);
 
-
-        drawTileXY(tileImages[tiles[row][col] - 1], x, y);
-
-    }
-    */
-
-    // DEBUG - testing the layout
-    /*
-    private void drawOuterGrid() {
-
-        StdDraw.setPenColor(Color.BLACK);
-        StdDraw.setPenRadius(0.002);
-
-        // first draw rows
-        for (int row = 0; row <= size; row++) {
-            double y = yBoardMin + row * gridSquareSize;
-            StdDraw.line(xBoardMin, y, xBoardMax, y);
-        }
-
-        // then draw columns
-        for (int col = 0; col <= size; col++) {
-            double x = xBoardMin + col * gridSquareSize;
-            StdDraw.line(x, yBoardMin, x, yBoardMax);
-        }
+        tiles[endRow][endCol].draw(xCenter, yCenter, gridSquareSize * (1.0 - TILE_BUFFER), inverted);
 
     }
-     */
-
-    // ANIMATED
-    /*
-    private void drawAnimatedGridSquares(double t) {
-
-        // System.out.printf("Drawing Animated Grid Squares (t = %.2f)\n",t);
-
-        for (int row = 0; row < size; row++) {
-            for (int col = 0; col < size; col++) {
-                // System.out.printf("Drawing: [ tile = %d, row = %d, col = %d ]\n", tiles[row][col], row, col);
-                // check if this is the swap tile
-                if (swapTile == tiles[row][col]) {
-                    // System.out.println("Drawing Swap Tile: " + swapTile);
-                    drawAnimatedTile(row, col, t);
-                } else {
-                    // System.out.println("Drawing normally.");
-                    drawTile(row, col);
-
-                }
-
-            }
-        }
-
-    }
-     */
-
-
-
-
-    // ANIMATED
-    /*
-    private void drawAnimatedTile(int row, int col, double t) {
-
-        if (tiles[row][col] == null) {
-            return;
-        }
-
-        tiles[row][col].drawAnimated(t);
-
-    }
-     */
 
 
 /* **************************************************************************
@@ -805,7 +729,7 @@ public class Board {
 
             Board testBoard = new Board(tiles);
             Solver solver = new Solver(testBoard);
-            if (!solver.isSolvable())
+            if (solver.unsolvable())
                 testBoard = testBoard.twin();
 
             return testBoard;
@@ -837,5 +761,55 @@ public class Board {
         return new Board(tiles);
 
     }
+
+/* **************************************************************************
+ *    Debug methods
+ * *************************************************************************/
+
+    // DEBUG: string representation of this board
+    /*
+    public String toString() {
+        // visual depiction of tile arrangement
+        StringBuilder tilesString = new StringBuilder();
+
+        // first print the board size on line 1
+        tilesString.append(tiles.length);
+        tilesString.append("\n");
+
+        for (int i = 0; i < tiles.length; i++) {
+            for (int j = 0; j < tiles[i].length; j++) {
+                if (tiles[i][j] == null)
+                    tilesString.append(String.format("%2d ", 0));
+                else
+                    tilesString.append(String.format("%2d ", tiles[i][j].val()));
+            }
+            tilesString.append("\n");
+        }
+
+        return tilesString.toString();
+    }
+     */
+
+    // DEBUG - testing the layout
+    /*
+    private void drawOuterGrid() {
+
+        StdDraw.setPenColor(Color.BLACK);
+        StdDraw.setPenRadius(0.002);
+
+        // first draw rows
+        for (int row = 0; row <= size; row++) {
+            double y = yBoardMin + row * gridSquareSize;
+            StdDraw.line(xBoardMin, y, xBoardMax, y);
+        }
+
+        // then draw columns
+        for (int col = 0; col <= size; col++) {
+            double x = xBoardMin + col * gridSquareSize;
+            StdDraw.line(x, yBoardMin, x, yBoardMax);
+        }
+
+    }
+     */
 
 }
